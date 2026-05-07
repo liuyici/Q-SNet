@@ -364,10 +364,10 @@ Q-SNet/
 ├── fig5_algorithm_qra.png
 └── fig6_algorithm_qlif.png
 
-### Thanks
-#### 🎉🎉🎉 I would like to thank [Huazhong Shu](https://ieeexplore.ieee.org/author/37287366300) for his improvements to my manuscript and providing guidance on quaternion theory.
-#### 🎉🎉🎉 I would like to thank [Jean Louis Coatrieux](https://ieeexplore.ieee.org/author/37298707200) for his help with quaternion theory.
-#### 🎉🎉🎉 I would like to thank [Regine Le Bouquin Jeannes](https://ieeexplore.ieee.org/author/37355517100), for his rigorous approach in formula derivation.
+## Thanks
+### 🎉🎉🎉 I would like to thank [Huazhong Shu](https://ieeexplore.ieee.org/author/37287366300) for his improvements to my manuscript and providing guidance on quaternion theory.
+### 🎉🎉🎉 I would like to thank [Jean Louis Coatrieux](https://ieeexplore.ieee.org/author/37298707200) for his help with quaternion theory.
+### 🎉🎉🎉 I would like to thank [Regine Le Bouquin Jeannes](https://ieeexplore.ieee.org/author/37355517100), for his rigorous approach in formula derivation.
 
 ## Citation
 Hope this code can be useful. I would appreciate you citing us in your paper. 😊
