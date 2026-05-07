@@ -121,7 +121,7 @@ Since quaternion magnitude is invariant under unit-quaternion rotations, the fir
 ## Feature Distribution Visualization
 
 <p align="center">
-  <img src="figs/fig5.png" width="950">
+  <img src="fig5.png" width="950">
 </p>
 
 The t-SNE visualization shows the feature evolution across different stages:
