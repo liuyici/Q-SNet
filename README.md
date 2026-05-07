@@ -346,13 +346,11 @@ Region-aware grouping achieves the best performance, indicating that physiologic
 The visualization shows a clear evolution of feature geometry. Raw EEG samples are highly mixed across subjects and emotion categories. After quaternion DE extraction and pre-training, the distribution becomes more structured. After fine-tuning, samples from the same emotion category form clearer clusters, and the source-target overlap improves.
 
 ---
-
 ## 📁 Repository Layout
 
 The current repository is organized by dataset-specific reproducibility folders.
 
 ```text
-
 Q-SNet/
 ├── seed-9376/                 # SEED experiment folder, reported Acc. = 93.76%
 ├── seed-iv-78.25/             # SEED-IV experiment folder, reported Acc. = 78.25%
@@ -364,13 +362,19 @@ Q-SNet/
 ├── fig5.png
 ├── fig5_algorithm_qra.png
 └── fig6_algorithm_qlif.png
+```
 
 ---
 
 ## Thanks
+
 ### 🎉🎉🎉 I would like to thank [Huazhong Shu](https://ieeexplore.ieee.org/author/37287366300) for his improvements to my manuscript and providing guidance on quaternion theory.
 ### 🎉🎉🎉 I would like to thank [Jean Louis Coatrieux](https://ieeexplore.ieee.org/author/37298707200) for his help with quaternion theory.
 ### 🎉🎉🎉 I would like to thank [Regine Le Bouquin Jeannes](https://ieeexplore.ieee.org/author/37355517100), for her rigorous approach in formula derivation.
+
+---
+
+
 
 ## Citation
 Hope this code can be useful. I would appreciate you citing us in your paper. 😊
