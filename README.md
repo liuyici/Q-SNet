@@ -1,262 +1,365 @@
-# Q-SNet: Quaternion Spiking Attention Network for Cross-Subject EEG Emotion Recognition
+<h1 align="center">Q-SNet</h1>
+
+<h3 align="center">
+Quaternion Spiking Attention Network for Cross-Subject EEG Emotion Recognition
+</h3>
 
 <p align="center">
-  <img src="fig1.png" width="950">
+  <b>Quaternion representation · Rotation attention · Magnitude-triggered spiking · Cross-subject EEG</b>
 </p>
 
 <p align="center">
-  <b>Q-SNet</b> is a quaternion-based spiking framework for cross-subject EEG emotion recognition.
-  It combines quaternion multi-channel coupling, quaternion rotation attention, and magnitude-triggered quaternion LIF neurons.
+  <img src="https://img.shields.io/badge/Task-Cross--Subject%20EEG%20Emotion%20Recognition-2b6cb0?style=flat-square">
+  <img src="https://img.shields.io/badge/Model-Quaternion%20Spiking%20Network-2f855a?style=flat-square">
+  <img src="https://img.shields.io/badge/Protocol-LOSOCV-dd6b20?style=flat-square">
+  <img src="https://img.shields.io/badge/Datasets-SEED%20%7C%20SEED--IV%20%7C%20SEED--V-6b46c1?style=flat-square">
+  <img src="https://img.shields.io/badge/Status-Code%20Released-111827?style=flat-square">
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Task-Cross--Subject%20EEG%20Emotion%20Recognition-blue">
-  <img src="https://img.shields.io/badge/Model-Quaternion%20Spiking%20Network-green">
-  <img src="https://img.shields.io/badge/Protocol-LOSOCV-orange">
-  <img src="https://img.shields.io/badge/Datasets-SEED%20%7C%20SEED--IV%20%7C%20SEED--V-purple">
+  <img src="fig1.png" width="960">
 </p>
-
----
-
-## Overview
-
-Cross-subject EEG emotion recognition is difficult because EEG responses vary substantially across individuals. This induces distribution shifts in both temporal dynamics and inter-channel spatial patterns. Most existing models are built on real-valued representations and learn channel dependencies implicitly through convolution, graph propagation, or attention. Such representations may not preserve the structural relationships among EEG channels when transferred to unseen subjects.
-
-Q-SNet addresses this issue by introducing quaternion algebra into spiking EEG modeling. Instead of treating EEG channels as independent scalar signals, Q-SNet groups spatially related EEG channels into quaternion representations, applies learnable quaternion rotations in the attention module, and triggers spikes according to quaternion magnitude. This design aims to improve cross-subject robustness while retaining the compact and event-driven characteristics of spiking neural networks.
-
----
-
-## Core Idea
-
-The central idea is simple:
-
-> EEG channels are not independent measurements.  
-> Q-SNet explicitly couples related EEG channels as quaternion components and performs attention, rotation, and spiking dynamics in quaternion space.
-
-Q-SNet contains three main components:
-
-1. **Quaternion-based DE feature extraction**  
-   Region-aware EEG channel groups are encoded into quaternion-valued signals, followed by quaternion Fourier analysis and component-wise DE feature extraction.
-
-2. **Quaternion Rotation Attention (QRA)**  
-   Learnable quaternion rotations are applied to the value branch of attention to model subject-dependent feature misalignment.
-
-3. **Quaternion LIF (Q-LIF)**  
-   Spike firing is determined by quaternion magnitude, leading to rotation-invariant firing behavior under quaternion transformations.
-
----
-
-## Why Quaternion Modeling?
-
-Quaternion algebra provides a compact hypercomplex representation for coupling four related components. For EEG, this is useful because spatially neighboring channels often reflect coordinated neural activity rather than isolated scalar responses.
-
-Compared with generic real-valued transformations, the Hamilton product uses structured parameter sharing. A quaternion weight has four independent components instead of a generic 4 × 4 real-valued matrix with sixteen independent parameters. This gives Q-SNet two advantages:
-
-- **Structured coupling**: multi-channel EEG relationships are modeled explicitly.
-- **Compact parameterization**: the model can maintain strong representation ability with fewer parameters.
-
-In Q-SNet, quaternion algebra is not used as a superficial layer replacement. It is used to define the signal representation, attention transformation, rotation operation, and spiking neuron dynamics.
-
----
-
-## Method Pipeline
 
 <p align="center">
-  <img src="fig3_algorithm_training.png" width="760">
+  <sub><b>Figure 1.</b> Overview of Q-SNet. EEG channels are grouped into quaternion representations, processed by quaternion rotation attention, and passed through magnitude-triggered Q-LIF neurons for robust cross-subject emotion recognition.</sub>
 </p>
-
-The full training pipeline consists of three stages:
-
-- **Stage 1: Quaternion-based DE feature extraction**  
-  Source and target EEG trials are transformed into quaternion DE features.
-
-- **Stage 2: Structural pre-training with QRA and Q-LIF**  
-  The model learns emotion-discriminative and domain-invariant features using source labels and adversarial domain learning.
-
-- **Stage 3: Fine-tuning with conditional alignment**  
-  Target pseudo-labels are used to perform class-wise source-target alignment.
 
 ---
 
-## Detailed Algorithms
+## 🔎 At a Glance
 
-### Quaternion-based DE Feature Extraction
+Q-SNet is a quaternion-based spiking framework for cross-subject EEG emotion recognition. It is designed for the setting where labeled EEG trials are available from source subjects, while the target subject is unlabeled during training.
+
+The method addresses three issues in cross-subject EEG decoding:
+
+<table>
+<tr>
+<td width="33%" align="center"><b>🧠 Multi-channel coupling</b></td>
+<td width="33%" align="center"><b>🧭 Subject shift</b></td>
+<td width="33%" align="center"><b>⚡ Spiking robustness</b></td>
+</tr>
+<tr>
+<td align="center"><sub>Spatially related EEG channels are packed into quaternion components instead of being treated as independent scalar signals.</sub></td>
+<td align="center"><sub>Learnable quaternion rotation is used in the attention value branch to model feature misalignment across subjects.</sub></td>
+<td align="center"><sub>Q-LIF fires according to quaternion magnitude, enabling rotation-invariant spike triggering.</sub></td>
+</tr>
+</table>
+
+---
+
+## ✨ Main Contributions
+
+- **Quaternion EEG representation.** Region-aware EEG channel groups are encoded as quaternion-valued signals to explicitly couple related multi-channel activity.
+
+- **Quaternion Rotation Attention (QRA).** Learnable quaternion rotations are introduced into the attention module to improve feature alignment under subject-dependent shifts.
+
+- **Quaternion LIF neuron (Q-LIF).** Spike firing is triggered by quaternion magnitude rather than scalar membrane potential, leading to rotation-invariant spiking dynamics.
+
+- **Strong cross-subject performance.** Q-SNet achieves consistent gains on SEED, SEED-IV, and SEED-V under leave-one-subject-out cross-validation.
+
+---
+
+## 🧩 Method Overview
+
+Q-SNet follows a three-stage pipeline.
+
+<p align="center">
+  <img src="fig3_algorithm_training.png" width="780">
+</p>
+
+<p align="center">
+  <sub><b>Algorithm 1.</b> Training pipeline of Q-SNet.</sub>
+</p>
+
+<table>
+<tr>
+<td width="30%" align="center"><b>Stage 1</b></td>
+<td width="35%" align="center"><b>Stage 2</b></td>
+<td width="35%" align="center"><b>Stage 3</b></td>
+</tr>
+<tr>
+<td align="center"><sub><b>Quaternion DE extraction</b><br>Source and target EEG trials are transformed into quaternion differential entropy features.</sub></td>
+<td align="center"><sub><b>Structural pre-training</b><br>QRA and Q-LIF are optimized with source classification and adversarial domain learning.</sub></td>
+<td align="center"><sub><b>Conditional fine-tuning</b><br>Target pseudo-labels are used for class-wise source-target alignment.</sub></td>
+</tr>
+</table>
+
+---
+
+## 🧮 Algorithm Details
+
+<details open>
+<summary><b>Algorithm 2: Quaternion-based DE Feature Extraction</b></summary>
 
 <p align="center">
   <img src="fig4_algorithm_quatde.png" width="760">
 </p>
 
-This stage constructs quaternion-valued EEG signals by grouping related channels. The quaternion spectral representation is then used to compute component-wise power spectral density and differential entropy features.
+This stage groups EEG channels into quaternion representations, applies quaternion spectral analysis, and extracts component-wise differential entropy features.
+</details>
 
-### Quaternion Rotation Attention
+<details open>
+<summary><b>Algorithm 3: Quaternion Rotation Attention</b></summary>
 
 <p align="center">
   <img src="fig5_algorithm_qra.png" width="760">
 </p>
 
-QRA replaces standard real-valued projections with quaternion projections and applies learnable quaternion rotation to the value component:
+QRA replaces real-valued projections with quaternion projections and rotates the value component using a learnable unit quaternion:
 
-\[
-V^{\circlearrowleft} = R \otimes V \otimes R^*
-\]
+<p align="center">
+  <code>V_rot = R ⊗ V ⊗ R*</code>
+</p>
 
-where \(R\) is a learnable unit quaternion, \(R^*\) is its conjugate, and \(\otimes\) denotes the Hamilton product.
+where <code>⊗</code> denotes the Hamilton product.
+</details>
 
-### Quaternion LIF Neuron
+<details open>
+<summary><b>Algorithm 4: Quaternion LIF Dynamics</b></summary>
 
 <p align="center">
   <img src="fig6_algorithm_qlif.png" width="760">
 </p>
 
-Unlike standard LIF neurons that use scalar membrane potentials, Q-LIF integrates quaternion-valued states and fires according to quaternion magnitude:
-
-\[
-S_m = \Theta(\|\tilde{U}_m\| - V_{th})
-\]
-
-Since quaternion magnitude is invariant under unit-quaternion rotations, the firing decision remains stable under rotational perturbations in quaternion feature space.
-
----
-
-## Feature Distribution Visualization
+Q-LIF integrates quaternion-valued membrane states and triggers spikes according to quaternion magnitude:
 
 <p align="center">
-  <img src="fig5.png" width="950">
+  <code>S = Θ(||U|| − V_th)</code>
 </p>
 
-The t-SNE visualization shows the feature evolution across different stages:
-
-- **Raw EEG signal**: source and target samples are highly mixed.
-- **Quaternion DE feature**: feature structure begins to emerge, but class separability remains limited.
-- **After pre-training**: QRA and Q-LIF produce more compact feature distributions.
-- **After fine-tuning**: samples from the same emotion category form clearer clusters, and source-target overlap improves.
-
-This visualization provides intuitive evidence that Q-SNet improves both class separability and cross-subject alignment.
+This magnitude-triggered mechanism is invariant to unit-quaternion rotations.
+</details>
 
 ---
 
-## Main Results
+## 📊 Main Results
 
-All experiments follow the leave-one-subject-out cross-validation protocol. One subject is used as the target domain, and the remaining subjects are used as source domains.
+All results are reported under leave-one-subject-out cross-validation. One subject is used as the target domain, and the remaining subjects are used as source domains.
 
-### Cross-subject emotion recognition performance
+<table>
+<thead>
+<tr>
+<th align="center"><sub>Dataset</sub></th>
+<th align="center"><sub>Classes</sub></th>
+<th align="center"><sub>Accuracy (%)</sub></th>
+<th align="center"><sub>F1 (%)</sub></th>
+<th align="center"><sub>AUC (%)</sub></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><sub>SEED</sub></td>
+<td align="center"><sub>3</sub></td>
+<td align="center"><sub><b>93.76 ± 5.08</b></sub></td>
+<td align="center"><sub><b>93.73 ± 5.13</b></sub></td>
+<td align="center"><sub><b>94.32 ± 3.81</b></sub></td>
+</tr>
+<tr>
+<td align="center"><sub>SEED-IV</sub></td>
+<td align="center"><sub>4</sub></td>
+<td align="center"><sub><b>78.25 ± 10.89</b></sub></td>
+<td align="center"><sub><b>76.31 ± 11.82</b></sub></td>
+<td align="center"><sub><b>85.60 ± 7.59</b></sub></td>
+</tr>
+<tr>
+<td align="center"><sub>SEED-V</sub></td>
+<td align="center"><sub>5</sub></td>
+<td align="center"><sub><b>89.98 ± 11.80</b></sub></td>
+<td align="center"><sub><b>89.53 ± 12.57</b></sub></td>
+<td align="center"><sub><b>93.68 ± 7.48</b></sub></td>
+</tr>
+</tbody>
+</table>
 
-| Dataset | Classes | Accuracy (%) | F1 (%) | AUC (%) |
-|---|---:|---:|---:|---:|
-| SEED | 3 | **93.76 ± 5.08** | **93.73 ± 5.13** | **94.32 ± 3.81** |
-| SEED-IV | 4 | **78.25 ± 10.89** | **76.31 ± 11.82** | **85.60 ± 7.59** |
-| SEED-V | 5 | **89.98 ± 11.80** | **89.53 ± 12.57** | **93.68 ± 7.48** |
+### Improvement over the strongest prior baseline
 
-Q-SNet achieves the best performance on all three datasets. In particular, it improves over the strongest prior baseline by:
-
-| Dataset | Previous Best | Q-SNet | Improvement |
-|---|---:|---:|---:|
-| SEED | 92.59 | **93.76** | +1.17 |
-| SEED-IV | 76.52 | **78.25** | +1.73 |
-| SEED-V | 80.21 | **89.98** | +9.77 |
+<table>
+<thead>
+<tr>
+<th align="center"><sub>Dataset</sub></th>
+<th align="center"><sub>Previous Best Acc. (%)</sub></th>
+<th align="center"><sub>Q-SNet Acc. (%)</sub></th>
+<th align="center"><sub>Gain</sub></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td align="center"><sub>SEED</sub></td>
+<td align="center"><sub>92.59</sub></td>
+<td align="center"><sub><b>93.76</b></sub></td>
+<td align="center"><sub><b>+1.17</b></sub></td>
+</tr>
+<tr>
+<td align="center"><sub>SEED-IV</sub></td>
+<td align="center"><sub>76.52</sub></td>
+<td align="center"><sub><b>78.25</b></sub></td>
+<td align="center"><sub><b>+1.73</b></sub></td>
+</tr>
+<tr>
+<td align="center"><sub>SEED-V</sub></td>
+<td align="center"><sub>80.21</sub></td>
+<td align="center"><sub><b>89.98</b></sub></td>
+<td align="center"><sub><b>+9.77</b></sub></td>
+</tr>
+</tbody>
+</table>
 
 ---
 
-## Ablation Study
+## 🧪 Ablation and Analysis
 
-The following ablation results show that each core component contributes to the final performance.
+<details open>
+<summary><b>Component Ablation</b></summary>
 
-| Method | SEED | SEED-IV | SEED-V |
-|---|---:|---:|---:|
-| w/o Quaternion Self-Attention | 88.44 ± 6.42 | 66.16 ± 10.41 | 83.20 ± 12.44 |
-| w/o MMD | 83.44 ± 8.69 | 69.77 ± 10.58 | 86.57 ± 10.87 |
-| w/o Quaternion LIF | 88.63 ± 7.94 | 71.28 ± 12.30 | 83.25 ± 12.39 |
-| Q-SNet | **93.76 ± 5.08** | **78.25 ± 10.89** | **89.98 ± 11.80** |
+<table>
+<thead>
+<tr>
+<th align="center"><sub>Model Variant</sub></th>
+<th align="center"><sub>SEED</sub></th>
+<th align="center"><sub>SEED-IV</sub></th>
+<th align="center"><sub>SEED-V</sub></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><sub>w/o Quaternion Self-Attention</sub></td>
+<td align="center"><sub>88.44 ± 6.42</sub></td>
+<td align="center"><sub>66.16 ± 10.41</sub></td>
+<td align="center"><sub>83.20 ± 12.44</sub></td>
+</tr>
+<tr>
+<td><sub>w/o MMD</sub></td>
+<td align="center"><sub>83.44 ± 8.69</sub></td>
+<td align="center"><sub>69.77 ± 10.58</sub></td>
+<td align="center"><sub>86.57 ± 10.87</sub></td>
+</tr>
+<tr>
+<td><sub>w/o Quaternion LIF</sub></td>
+<td align="center"><sub>88.63 ± 7.94</sub></td>
+<td align="center"><sub>71.28 ± 12.30</sub></td>
+<td align="center"><sub>83.25 ± 12.39</sub></td>
+</tr>
+<tr>
+<td><sub><b>Q-SNet</b></sub></td>
+<td align="center"><sub><b>93.76 ± 5.08</b></sub></td>
+<td align="center"><sub><b>78.25 ± 10.89</b></sub></td>
+<td align="center"><sub><b>89.98 ± 11.80</b></sub></td>
+</tr>
+</tbody>
+</table>
 
-The performance drop after removing quaternion self-attention indicates that quaternion-valued attention is important for multi-channel representation learning. Removing Q-LIF also reduces performance, confirming the importance of magnitude-triggered spiking dynamics. Removing MMD weakens domain alignment, especially under cross-subject distribution shifts.
+The degradation caused by removing QRA, Q-LIF, or MMD indicates that the final performance is not produced by a single isolated module. Quaternion attention improves multi-channel representation, Q-LIF stabilizes spiking dynamics, and MMD contributes to source-target alignment.
+</details>
+
+<details>
+<summary><b>Rotation Strategy</b></summary>
+
+<table>
+<thead>
+<tr>
+<th align="center"><sub>Rotation Strategy</sub></th>
+<th align="center"><sub>SEED</sub></th>
+<th align="center"><sub>SEED-IV</sub></th>
+<th align="center"><sub>SEED-V</sub></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><sub>X-axis</sub></td>
+<td align="center"><sub>90.07</sub></td>
+<td align="center"><sub>70.44</sub></td>
+<td align="center"><sub>86.39</sub></td>
+</tr>
+<tr>
+<td><sub>Y-axis</sub></td>
+<td align="center"><sub>90.36</sub></td>
+<td align="center"><sub>69.38</sub></td>
+<td align="center"><sub>87.17</sub></td>
+</tr>
+<tr>
+<td><sub>Z-axis</sub></td>
+<td align="center"><sub>92.84</sub></td>
+<td align="center"><sub>73.42</sub></td>
+<td align="center"><sub>87.21</sub></td>
+</tr>
+<tr>
+<td><sub><b>Learnable random-axis</b></sub></td>
+<td align="center"><sub><b>93.76</b></sub></td>
+<td align="center"><sub><b>78.25</b></sub></td>
+<td align="center"><sub><b>89.98</b></sub></td>
+</tr>
+</tbody>
+</table>
+
+Learnable quaternion rotation consistently outperforms fixed-axis rotations, suggesting that the rotation axis should be optimized from data rather than manually predefined.
+</details>
+
+<details>
+<summary><b>Channel Grouping Strategy</b></summary>
+
+<table>
+<thead>
+<tr>
+<th align="center"><sub>Grouping Strategy</sub></th>
+<th align="center"><sub>SEED</sub></th>
+<th align="center"><sub>SEED-IV</sub></th>
+<th align="center"><sub>SEED-V</sub></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><sub>Random grouping</sub></td>
+<td align="center"><sub>90.07 ± 8.89</sub></td>
+<td align="center"><sub>70.42 ± 15.17</sub></td>
+<td align="center"><sub>82.33 ± 10.75</sub></td>
+</tr>
+<tr>
+<td><sub>Original grouping</sub></td>
+<td align="center"><sub>91.49 ± 6.72</sub></td>
+<td align="center"><sub>77.88 ± 11.35</sub></td>
+<td align="center"><sub>88.51 ± 12.39</sub></td>
+</tr>
+<tr>
+<td><sub><b>Region-aware grouping</b></sub></td>
+<td align="center"><sub><b>93.76 ± 5.08</b></sub></td>
+<td align="center"><sub><b>78.25 ± 10.89</b></sub></td>
+<td align="center"><sub><b>89.98 ± 11.80</b></sub></td>
+</tr>
+</tbody>
+</table>
+
+Region-aware grouping achieves the best performance, indicating that physiologically meaningful channel organization improves quaternion-based EEG representation learning.
+</details>
 
 ---
 
-## Rotation Strategy Analysis
+## 🗺️ Feature Distribution Visualization
 
-Q-SNet uses learnable quaternion rotations instead of fixed-axis rotations.
+<p align="center">
+  <img src="fig5.png" width="960">
+</p>
 
-| Rotation Strategy | SEED | SEED-IV | SEED-V |
-|---|---:|---:|---:|
-| X-axis | 90.07 | 70.44 | 86.39 |
-| Y-axis | 90.36 | 69.38 | 87.17 |
-| Z-axis | 92.84 | 73.42 | 87.21 |
-| Learnable random-axis rotation | **93.76** | **78.25** | **89.98** |
+<p align="center">
+  <sub><b>Figure 2.</b> t-SNE visualization from raw EEG signals to quaternion DE features, after pre-training, and after fine-tuning.</sub>
+</p>
 
-The learnable rotation consistently outperforms fixed-axis rotations, suggesting that the optimal alignment direction should be learned from data rather than predefined manually.
-
----
-
-## Channel Grouping Analysis
-
-Q-SNet constructs quaternion representations by grouping EEG channels. The grouping strategy directly affects how well inter-channel relationships are encoded.
-
-| Grouping Strategy | SEED | SEED-IV | SEED-V |
-|---|---:|---:|---:|
-| Random grouping | 90.07 ± 8.89 | 70.42 ± 15.17 | 82.33 ± 10.75 |
-| Original grouping | 91.49 ± 6.72 | 77.88 ± 11.35 | 88.51 ± 12.39 |
-| Region-aware grouping | **93.76 ± 5.08** | **78.25 ± 10.89** | **89.98 ± 11.80** |
-
-Region-aware grouping achieves the best performance, indicating that physiologically meaningful channel grouping improves quaternion-based EEG representation learning.
+The visualization shows a clear evolution of feature geometry. Raw EEG samples are highly mixed across subjects and emotion categories. After quaternion DE extraction and pre-training, the distribution becomes more structured. After fine-tuning, samples from the same emotion category form clearer clusters, and the source-target overlap improves.
 
 ---
 
-## Efficiency and Parameter Analysis
+## 📁 Repository Layout
 
-Q-SNet is designed to improve the trade-off between recognition performance and model compactness. The Hamilton-product-based quaternion layers reduce the number of independent parameters through structured weight sharing, while the spiking mechanism retains event-driven computation potential.
-
-Compared with real-valued attention and Transformer variants under matched dimensions, Q-SNet provides a stronger accuracy-efficiency trade-off. This is particularly important for EEG applications where model deployment, subject adaptation, and computational cost are practical concerns.
-
----
-
-## Reproducibility
-
-This repository is organized to support reviewer-side reproducibility. It provides:
-
-- source code for quaternion operations
-- QRA and Q-LIF modules
-- LOSOCV training protocol
-- dataset preparation instructions
-- scripts for pre-training and fine-tuning
-- result logging and evaluation utilities
-- figures and pseudocode used in the manuscript
-
-Recommended repository structure:
+The current repository is organized by dataset-specific reproducibility folders.
 
 ```text
 Q-SNet/
+├── seed-9376/                 # SEED experiment folder, reported Acc. = 93.76%
+├── seed-iv-78.25/             # SEED-IV experiment folder, reported Acc. = 78.25%
+├── seed-v-89.98/              # SEED-V experiment folder, reported Acc. = 89.98%
 ├── README.md
-├── requirements.txt
-├── configs/
-│   ├── seed.yaml
-│   ├── seed_iv.yaml
-│   └── seed_v.yaml
-├── data/
-│   ├── SEED/
-│   ├── SEED_IV/
-│   └── SEED_V/
-├── features/
-│   ├── SEED/
-│   ├── SEED_IV/
-│   └── SEED_V/
-├── models/
-│   ├── quaternion_layers.py
-│   ├── qra.py
-│   ├── qlif.py
-│   └── qsnet.py
-├── scripts/
-│   ├── extract_quaternion_de.py
-│   ├── pretrain.py
-│   ├── finetune.py
-│   └── evaluate.py
-├── utils/
-│   ├── data_loader.py
-│   ├── metrics.py
-│   └── seed.py
-└── figs/
-    ├── fig1_framework.png
-    ├── fig2_tsne.png
-    ├── fig3_algorithm_training.png
-    ├── fig4_algorithm_quatde.png
-    ├── fig5_algorithm_qra.png
-    └── fig6_algorithm_qlif.png
+├── fig1.png
+├── fig3_algorithm_training.png
+├── fig4_algorithm_quatde.png
+├── fig5.png
+├── fig5_algorithm_qra.png
+└── fig6_algorithm_qlif.png
