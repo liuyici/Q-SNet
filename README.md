@@ -218,6 +218,9 @@ All results are reported under leave-one-subject-out cross-validation. One subje
 </tbody>
 </table>
 
+
+
+
 ### Improvement over the strongest prior baseline
 
 <table>
@@ -250,6 +253,13 @@ All results are reported under leave-one-subject-out cross-validation. One subje
 </tr>
 </tbody>
 </table>
+
+### All sessions on SEED, SEED-IV and SEED-V datasets
+
+<p align="center">
+  <img src="all_subjects.png" width="960">
+</p>
+
 
 ---
 
