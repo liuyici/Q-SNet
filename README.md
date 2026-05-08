@@ -173,46 +173,9 @@ As a consequence, the spike triggering condition of Q-LIF is invariant under suc
 
 <details open>
 <summary><b>Proof</b></summary>
-
-The quaternion norm is defined as $\|q\| = \sqrt{q \otimes q^{*}}$. Let
-
-$$
-\tilde{U}[a,i,j,k]_m' = R \otimes \tilde{U}[a,i,j,k]_m \otimes R^{*}.
-$$
-
-Then
-
-$$
-\begin{aligned}
-\left\|\tilde{U}[a,i,j,k]_m'\right\|^2
-&= \tilde{U}[a,i,j,k]_m' \otimes \left(\tilde{U}[a,i,j,k]_m'\right)^{*} \\
-&= \left(R \otimes \tilde{U}[a,i,j,k]_m \otimes R^{*}\right) \otimes
-\left(R \otimes \tilde{U}[a,i,j,k]_m \otimes R^{*}\right)^{*} \\
-&= \left(R \otimes \tilde{U}[a,i,j,k]_m \otimes R^{*}\right) \otimes
-\left((R^{*})^{*} \otimes \tilde{U}[a,i,j,k]_m^{*} \otimes R^{*}\right) \\
-&= \left(R \otimes \tilde{U}[a,i,j,k]_m \otimes R^{*}\right) \otimes
-\left(R \otimes \tilde{U}[a,i,j,k]_m^{*} \otimes R^{*}\right) \\
-&= R \otimes \tilde{U}[a,i,j,k]_m \otimes
-\underbrace{\left(R^{*} \otimes R\right)}_{=\,1} \otimes
-\tilde{U}[a,i,j,k]_m^{*} \otimes R^{*} \\
-&= R \otimes \left(\tilde{U}[a,i,j,k]_m \otimes \tilde{U}[a,i,j,k]_m^{*}\right) \otimes R^{*} \\
-&= R \otimes \left\|\tilde{U}[a,i,j,k]_m\right\|^{2} \otimes R^{*} \\
-&= \left\|\tilde{U}[a,i,j,k]_m\right\|^{2} \otimes R \otimes R^{*} \\
-&= \left\|\tilde{U}[a,i,j,k]_m\right\|^{2}.
-\end{aligned}
-$$
-
-Here, we use $(abc)^{*}=c^{*}b^{*}a^{*}$, $(R^{*})^{*}=R$, associativity of the Hamilton product, the unit-quaternion identity $R^{*}\otimes R=R\otimes R^{*}=1$, and the fact that $\left\|\tilde{U}[a,i,j,k]_m\right\|^{2}$ is a real scalar and therefore commutes with quaternion multiplication.
-
-Since $\left\|\tilde{U}[a,i,j,k]_m'\right\|^2 = \left\|\tilde{U}[a,i,j,k]_m\right\|^2$, it follows that
-
-$$
-\left\|\tilde{U}[a,i,j,k]_m'\right\| = \left\|\tilde{U}[a,i,j,k]_m\right\|.
-$$
-
-Therefore, the Q-LIF spike condition $\left\|\tilde{U}[a,i,j,k]_m\right\| \ge V_{\mathrm{th}}$ is unchanged by unit-quaternion rotations.
-
-</details>
+<p align="center">
+  <img src="proof.png" width="760">
+</p>
 
 ---
 
