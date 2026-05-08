@@ -132,6 +132,90 @@ This magnitude-triggered mechanism is invariant to unit-quaternion rotations.
 
 ---
 
+## 🧠 Theoretical Analysis of Quaternion Rotation-Invariant Spiking
+
+This section provides a representation-level analysis of the rotation-invariant property of the Q-LIF neuron. The goal is to clarify the mathematical property underlying the magnitude-based spike triggering mechanism, rather than to establish a causal model of cross-subject EEG variability.
+
+### Rotation of Quaternion-Valued Membrane Potentials
+
+Let $u \in \mathbb{H}$ denote a quaternion-valued membrane potential. A spatial transformation in quaternion space can be represented by a unit quaternion $R \in \mathbb{H}$ with $\|R\|=1$, acting on $u$ via the sandwich product:
+
+$$
+u' = R \otimes u \otimes R^{*},
+$$
+
+where $\otimes$ denotes the Hamilton product and $R^{*}$ is the quaternion conjugate of $R$. This transformation is commonly used to model orientation changes in quaternion representations. For a general quaternion, the sandwich product rotates the imaginary vector component while preserving the real component and the quaternion norm.
+
+### Rotation Invariance of Magnitude-Based Spiking
+
+The Q-LIF neuron generates spikes based on the magnitude of the membrane potential. Specifically, a spike is emitted when
+
+$$
+\left\|\tilde{U}[a,i,j,k]_m\right\| \ge V_{\mathrm{th}},
+$$
+
+where $\|\cdot\|$ denotes the quaternion norm and $V_{\mathrm{th}}$ is a fixed threshold.
+
+**Proposition.** Let $\tilde{U}[a,i,j,k]_m \in \mathbb{H}$ be a quaternion-valued membrane potential and let $R$ be any unit quaternion. Then the magnitude of $\tilde{U}[a,i,j,k]_m$ is invariant under the rotation
+
+$$
+\tilde{U}[a,i,j,k]_m \mapsto R \otimes \tilde{U}[a,i,j,k]_m \otimes R^{*},
+$$
+
+that is,
+
+$$
+\left\|R \otimes \tilde{U}[a,i,j,k]_m \otimes R^{*}\right\|
+= \left\|\tilde{U}[a,i,j,k]_m\right\|.
+$$
+
+As a consequence, the spike triggering condition of Q-LIF is invariant under such unit-quaternion rotations.
+
+<details open>
+<summary><b>Proof</b></summary>
+
+The quaternion norm is defined as $\|q\| = \sqrt{q \otimes q^{*}}$. Let
+
+$$
+\tilde{U}[a,i,j,k]_m' = R \otimes \tilde{U}[a,i,j,k]_m \otimes R^{*}.
+$$
+
+Then
+
+$$
+\begin{aligned}
+\left\|\tilde{U}[a,i,j,k]_m'\right\|^2
+&= \tilde{U}[a,i,j,k]_m' \otimes \left(\tilde{U}[a,i,j,k]_m'\right)^{*} \\
+&= \left(R \otimes \tilde{U}[a,i,j,k]_m \otimes R^{*}\right) \otimes
+\left(R \otimes \tilde{U}[a,i,j,k]_m \otimes R^{*}\right)^{*} \\
+&= \left(R \otimes \tilde{U}[a,i,j,k]_m \otimes R^{*}\right) \otimes
+\left((R^{*})^{*} \otimes \tilde{U}[a,i,j,k]_m^{*} \otimes R^{*}\right) \\
+&= \left(R \otimes \tilde{U}[a,i,j,k]_m \otimes R^{*}\right) \otimes
+\left(R \otimes \tilde{U}[a,i,j,k]_m^{*} \otimes R^{*}\right) \\
+&= R \otimes \tilde{U}[a,i,j,k]_m \otimes
+\underbrace{\left(R^{*} \otimes R\right)}_{=\,1} \otimes
+\tilde{U}[a,i,j,k]_m^{*} \otimes R^{*} \\
+&= R \otimes \left(\tilde{U}[a,i,j,k]_m \otimes \tilde{U}[a,i,j,k]_m^{*}\right) \otimes R^{*} \\
+&= R \otimes \left\|\tilde{U}[a,i,j,k]_m\right\|^{2} \otimes R^{*} \\
+&= \left\|\tilde{U}[a,i,j,k]_m\right\|^{2} \otimes R \otimes R^{*} \\
+&= \left\|\tilde{U}[a,i,j,k]_m\right\|^{2}.
+\end{aligned}
+$$
+
+Here, we use $(abc)^{*}=c^{*}b^{*}a^{*}$, $(R^{*})^{*}=R$, associativity of the Hamilton product, the unit-quaternion identity $R^{*}\otimes R=R\otimes R^{*}=1$, and the fact that $\left\|\tilde{U}[a,i,j,k]_m\right\|^{2}$ is a real scalar and therefore commutes with quaternion multiplication.
+
+Since $\left\|\tilde{U}[a,i,j,k]_m'\right\|^2 = \left\|\tilde{U}[a,i,j,k]_m\right\|^2$, it follows that
+
+$$
+\left\|\tilde{U}[a,i,j,k]_m'\right\| = \left\|\tilde{U}[a,i,j,k]_m\right\|.
+$$
+
+Therefore, the Q-LIF spike condition $\left\|\tilde{U}[a,i,j,k]_m\right\| \ge V_{\mathrm{th}}$ is unchanged by unit-quaternion rotations.
+
+</details>
+
+---
+
 ## 📊 Main Results
 
 All results are reported under leave-one-subject-out cross-validation. One subject is used as the target domain, and the remaining subjects are used as source domains.
