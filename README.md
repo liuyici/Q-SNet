@@ -134,42 +134,6 @@ This magnitude-triggered mechanism is invariant to unit-quaternion rotations.
 
 ## 🧠 Theoretical Analysis of Quaternion Rotation-Invariant Spiking
 
-This section provides a representation-level analysis of the rotation-invariant property of the Q-LIF neuron. The goal is to clarify the mathematical property underlying the magnitude-based spike triggering mechanism, rather than to establish a causal model of cross-subject EEG variability.
-
-### Rotation of Quaternion-Valued Membrane Potentials
-
-Let $u \in \mathbb{H}$ denote a quaternion-valued membrane potential. A spatial transformation in quaternion space can be represented by a unit quaternion $R \in \mathbb{H}$ with $\|R\|=1$, acting on $u$ via the sandwich product:
-
-$$
-u' = R \otimes u \otimes R^{*},
-$$
-
-where $\otimes$ denotes the Hamilton product and $R^{*}$ is the quaternion conjugate of $R$. This transformation is commonly used to model orientation changes in quaternion representations. For a general quaternion, the sandwich product rotates the imaginary vector component while preserving the real component and the quaternion norm.
-
-### Rotation Invariance of Magnitude-Based Spiking
-
-The Q-LIF neuron generates spikes based on the magnitude of the membrane potential. Specifically, a spike is emitted when
-
-$$
-\left\|\tilde{U}[a,i,j,k]_m\right\| \ge V_{\mathrm{th}},
-$$
-
-where $\|\cdot\|$ denotes the quaternion norm and $V_{\mathrm{th}}$ is a fixed threshold.
-
-**Proposition.** Let $\tilde{U}[a,i,j,k]_m \in \mathbb{H}$ be a quaternion-valued membrane potential and let $R$ be any unit quaternion. Then the magnitude of $\tilde{U}[a,i,j,k]_m$ is invariant under the rotation
-
-$$
-\tilde{U}[a,i,j,k]_m \mapsto R \otimes \tilde{U}[a,i,j,k]_m \otimes R^{*},
-$$
-
-that is,
-
-$$
-\left\|R \otimes \tilde{U}[a,i,j,k]_m \otimes R^{*}\right\|
-= \left\|\tilde{U}[a,i,j,k]_m\right\|.
-$$
-
-As a consequence, the spike triggering condition of Q-LIF is invariant under such unit-quaternion rotations.
 
 <details open>
 <summary><b>Proof</b></summary>
