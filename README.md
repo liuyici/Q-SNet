@@ -392,6 +392,11 @@ Q-SNet/
 ```
 
 ---
+### Reproducibility Entry Points
+
+Run `main.py` inside each dataset folder to obtain the subject-wise average results for the corresponding dataset and experimental protocol.
+
+`Q_SNet.py` is retained as a development and debugging script. It includes best-iteration and target-metric monitoring, so it can be useful for implementation checks or private parameter exploration. 
 
 ## Thanks
 
