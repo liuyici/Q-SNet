@@ -10,7 +10,32 @@ from torch.utils.data import DataLoader, TensorDataset
 SUBJECTS = [f"{index}_123" for index in range(1, 17)]
 
 
-def load_subjects(file_path, session, feature):
+def trial_windows(features, labels, size):
+    """Window each trial independently; never join different emotion trials."""
+    features = np.asarray(features)
+    labels = np.asarray(labels).reshape(-1)
+    if size <= 0:
+        raise ValueError("Window size must be positive")
+    if len(labels) == 1:
+        labels = np.repeat(labels, len(features))
+    if len(features) != len(labels):
+        raise ValueError("Trial features and labels must have the same length")
+    if np.unique(labels).size != 1:
+        raise ValueError("Each SEED-V trial must have one emotion label")
+    if features.ndim == 4 or (features.ndim == 3 and features.shape[-1] == 310):
+        if features.shape[1] != size:
+            raise ValueError(f"Prewindowed features have {features.shape[1]} steps; expected {size}")
+        return features, labels
+    if not (features.ndim == 2 and features.shape[-1] == 310
+            or features.ndim == 3 and features.shape[1:] == (62, 5)):
+        raise ValueError("Expected per-frame [N,310] or [N,62,5] features")
+    if len(features) < size:
+        raise ValueError(f"Need at least {size} frames in a trial, got {len(features)}")
+    windows = np.stack([features[i:i + size] for i in range(len(features) - size + 1)])
+    return windows, labels[size - 1:]
+
+
+def load_subjects(file_path, session, feature, window_size=4):
     if session not in (1, 2, 3):
         raise ValueError("Session must be 1, 2, or 3")
     if feature != "de_LDS":
@@ -26,8 +51,9 @@ def load_subjects(file_path, session, feature):
         subject_labels = []
         first_trial = (session - 1) * 15
         for trial_index in range(first_trial, first_trial + 15):
-            subject_features.append(np.asarray(data[trial_index]))
-            subject_labels.append(np.asarray(trial_labels[trial_index]).reshape(-1))
+            features, trial_y = trial_windows(data[trial_index], trial_labels[trial_index], window_size)
+            subject_features.append(features)
+            subject_labels.append(trial_y)
         subjects.append(np.concatenate(subject_features, axis=0).astype(np.float32))
         labels.append(np.concatenate(subject_labels, axis=0).astype(np.int64))
     return subjects, labels

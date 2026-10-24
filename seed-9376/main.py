@@ -1,4 +1,7 @@
 import argparse
+from contextlib import redirect_stdout
+import hashlib
+import sys
 import json
 import math
 import random
@@ -14,6 +17,10 @@ from sklearn.preprocessing import label_binarize
 
 from core_qnn.quaternion_layers import QuaternionLinear
 from data_final import build_loso_loaders, load_subjects
+
+
+DATASET = "SEED"
+DEFAULT_CONFIG = Path(__file__).resolve().parents[1] / "configs" / "paper.json"
 
 
 def set_seed(seed):
@@ -175,7 +182,8 @@ class EncoderBlock(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
-        return x + self.dropout(self.attention(self.norm(x)))
+        # Manuscript residual block: LN(x + Attention(x)).
+        return self.norm(x + self.dropout(self.attention(x)))
 
 
 class QuaternionLIFLayer(nn.Module):
@@ -317,6 +325,7 @@ class FinalProtocol:
             source_iterator = iter(source_loader)
             target_iterator = iter(target_loader)
             running = 0.0
+            running_cls = running_domain = 0.0
             for step in range(steps):
                 source_batch, source_iterator = next_batch(source_iterator, source_loader)
                 target_batch, target_iterator = next_batch(target_iterator, target_loader)
@@ -340,7 +349,11 @@ class FinalProtocol:
                 loss.backward()
                 optimizer.step()
                 running += loss.item()
-            print(f"pretrain epoch {epoch + 1:03d}/{epochs:03d} loss {running / steps:.6f}")
+                running_cls += cls_loss.item()
+                running_domain += domain_loss.item()
+            print(f"pretrain epoch {epoch + 1:03d}/{epochs:03d} loss {running / steps:.6f} "
+                  f"cls {running_cls / steps:.6f} domain {running_domain / steps:.6f} "
+                  f"beta {self.adversarial_weight:g} lambda_last {strength:.6f}")
 
     def fine_tune(self, source_loader, target_loader, epochs):
         optimizer = torch.optim.SGD(self.model.parameters(), lr=self.learning_rate, momentum=0.9, weight_decay=self.weight_decay)
@@ -465,7 +478,13 @@ def run_subject(args, subjects, labels, target_index, device):
 
 
 def parse_args(argv=None):
-    parser = argparse.ArgumentParser()
+    config_parser = argparse.ArgumentParser(add_help=False)
+    config_parser.add_argument("--config", default=str(DEFAULT_CONFIG))
+    config_args, _ = config_parser.parse_known_args(argv)
+    settings = json.loads(Path(config_args.config).read_text(encoding="utf-8"))
+    parser = argparse.ArgumentParser(parents=[config_parser])
+    parser.add_argument("--window-size", type=int, default=4,
+                        help="Consecutive feature frames per sample (default: 4)")
     parser.add_argument("--file-path", type=str, default="/home/lyc/research/research_5/DA/ExtractedQuantFeatures/")
     parser.add_argument("--session", type=int, default=1)
     parser.add_argument("--feature", type=str, default="de_LDS")
@@ -496,8 +515,15 @@ def parse_args(argv=None):
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--checkpoint-dir", type=str, default="final_checkpoints")
     parser.add_argument("--results-file", type=str, default="final_results.json")
+    defaults = {**settings["common"], **settings["datasets"][DATASET]}
+    known = {action.dest for action in parser._actions}
+    if set(defaults) - known:
+        parser.error(f"Unknown configuration fields: {sorted(set(defaults) - known)}")
+    parser.set_defaults(**defaults)
     args = parser.parse_args(argv)
-    for name in ("pretrain_epochs", "fine_tune_epochs", "batch_size", "evaluation_batch_size", "depth", "heads"):
+    args.config_version = settings["version"]
+    args.config_sha256 = hashlib.sha256(Path(args.config).read_bytes()).hexdigest()
+    for name in ("window_size", "pretrain_epochs", "fine_tune_epochs", "batch_size", "evaluation_batch_size", "depth", "heads"):
         if getattr(args, name) <= 0:
             parser.error(f"--{name.replace('_', '-')} must be positive")
     if args.target < 0:
@@ -532,10 +558,12 @@ def source_revision():
         return None
 
 
-def main():
-    args = parse_args()
+def run_experiment(args):
     device = torch.device(args.device)
-    subjects, labels = load_subjects(args.file_path, args.session, args.feature)
+    subjects, labels = load_subjects(args.file_path, args.session, args.feature, args.window_size)
+    for subject in subjects:
+        if subject.ndim not in (3, 4) or subject.shape[1] != args.window_size:
+            raise ValueError(f"Loaded data must contain {args.window_size} feature frames per sample")
     if args.target > len(subjects):
         raise ValueError(f"Target subject {args.target} exceeds {len(subjects)} loaded subjects")
     target_indices = [args.target - 1] if args.target else list(range(len(subjects)))
@@ -550,7 +578,8 @@ def main():
         "source_revision": source_revision(),
         "architecture": {"effective_input_dim": INPUT_DIM, "stored_quaternion_dim": QUATERNION_DIM,
                          "spiking_hidden_dim": args.hidden_dim, "spiking_output_dim": 128,
-                         "classifier_bottleneck_dim": 64, "attention_heads": args.heads},
+                         "classifier_bottleneck_dim": 64, "attention_heads": args.heads,
+                         "window_size": args.window_size, "normalization": "post"},
         **aggregate_results(results),
     }
     result_path = Path(args.results_file)
@@ -558,6 +587,38 @@ def main():
     serialized = json.dumps(output, indent=2, ensure_ascii=False, allow_nan=False)
     result_path.write_text(serialized, encoding="utf-8")
     print(serialized)
+
+
+class RunLog:
+    """Mirror progress to the terminal and the run's persistent log."""
+    def __init__(self, terminal, stream):
+        self.terminal = terminal
+        self.stream = stream
+
+    def write(self, value):
+        self.terminal.write(value)
+        self.stream.write(value)
+        self.flush()
+        return len(value)
+
+    def flush(self):
+        self.terminal.flush()
+        self.stream.flush()
+
+
+def main():
+    args = parse_args()
+    result_path = Path(args.results_file)
+    result_path.parent.mkdir(parents=True, exist_ok=True)
+    config_path = result_path.with_suffix(".config.json")
+    log_path = result_path.with_suffix(".log")
+    resolved = {"dataset": DATASET, "source_revision": source_revision(),
+                "normalization": "post", "config": vars(args)}
+    config_path.write_text(json.dumps(resolved, indent=2), encoding="utf-8")
+    with log_path.open("w", encoding="utf-8") as stream:
+        with redirect_stdout(RunLog(sys.stdout, stream)):
+            print(json.dumps(resolved, ensure_ascii=False))
+            run_experiment(args)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,30 @@
+{
+  "version": "q-snet-paper-v2",
+  "common": {
+    "window_size": 4,
+    "quaternion_dim": 320,
+    "hidden_dim": 256,
+    "heads": 8,
+    "depth": 6,
+    "dropout": 0.5,
+    "tau": 1.0,
+    "threshold": 0.4,
+    "learning_rate": 0.001,
+    "weight_decay": 0.0005,
+    "mmd_weight": 1.0,
+    "adversarial_weight": 0.01,
+    "grl_lambda": 1.0,
+    "grl_schedule": "sigmoid",
+    "pseudo_label_confidence": 0.0,
+    "pretrain_epochs": 50,
+    "fine_tune_epochs": 200,
+    "batch_size": 50,
+    "evaluation_batch_size": 200,
+    "seed": 1
+  },
+  "datasets": {
+    "SEED": {"classes": 3, "session": 1, "feature": "de_LDS"},
+    "SEED-IV": {"classes": 4, "session": 3, "feature": "de_LDS"},
+    "SEED-V": {"classes": 5, "session": 3, "feature": "de_LDS"}
+  }
+}

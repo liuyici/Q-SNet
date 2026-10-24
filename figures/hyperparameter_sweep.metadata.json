@@ -1,0 +1,12 @@
+{
+  "data_version": "supplied-sensitivity-sweep",
+  "config_version": "q-snet-paper-v2",
+  "data_sha256": "d186aa9353a47689e9515f34e52e62142fc859819e8ea7fb2178121e77c119ce",
+  "config_sha256": "3cdf9d072b23eeda69703094b0fb138dd51d45f04b9ab9bfe0d22b4a25259c61",
+  "selected_values": {
+    "batch_size": 50,
+    "depth": 6,
+    "grl_lambda": 1,
+    "adversarial_weight": 0.01
+  }
+}

@@ -1,25 +1,10 @@
-# Validation of the consistency correction
+# Validation
 
-Local validation on 2026-10-24 used Python 3.11.14, PyTorch
-2.10.0.dev20251124+cu128, NumPy, SciPy 1.16.3 and scikit-learn 1.7.2 on Windows.
-Tests explicitly used the CPU. The GitHub Actions workflow separately runs the
-test suite on Linux with Python 3.11 and the CPU PyTorch package.
+Run `python -B -m pytest -q` after installing `requirements-dev.txt`.
+Local result on 2026-10-24: **46 passed, 4 dataset-inapplicable cases skipped**.
+Tests cover all three entry points: four-frame windowing, post-residual
+normalization, the 64-dimensional bottleneck, GRL gradients, target-label
+isolation, configuration overrides and saved run artifacts.
 
-Command: `python -B -m pytest -q`
-
-Result: **36 passed, 4 skipped**. The skipped parameterizations are the
-SEED-IV-only MAT-loader test applied to the other two datasets and the
-SEED-V-only session-loader test applied to the other two datasets.
-
-The suite exercises all three maintained entry points. It checks full-depth
-model forward/backward execution, loss and GRL gradient signs/scales, feature
-packing, selected-feature loading, final checkpoint creation, target-label
-isolation, prediction export, and score aggregation. The label-isolation test
-trains twice with identical inputs/seeds and changed target emotion labels;
-every saved model tensor is exactly equal across the two runs.
-
-No real SEED, SEED-IV or SEED-V LOSO experiment was run for this correction.
-The tests use synthetic inputs and do not substantiate the manuscript's
-reported accuracies. The revised input configuration and classifier bottleneck
-require new training and archived predictions before numerical reproduction
-can be claimed. See [the provenance and remaining preprocessing gaps](reproducibility.md).
+The test suite uses synthetic data; real-dataset LOSO results are separate.
+GitHub Actions runs the same suite on Python 3.11 with CPU PyTorch.

@@ -53,7 +53,7 @@ def test_default_model_shapes_and_backward(implementation):
         model.qlif.second.register_forward_hook(lambda _, inputs, output: seen.update(second=output[0].shape)),
         model.bottleneck.register_forward_hook(lambda _, inputs, output: seen.update(bottleneck=output.shape)),
     ]
-    inputs = torch.randn(2, 3, 62, 5, requires_grad=True)
+    inputs = torch.randn(2, 4, 62, 5, requires_grad=True)
     features, logits = model(inputs)
     assert seen == {"first": (2, 256), "second": (2, 128), "bottleneck": (2, 64)}
     assert features.shape == (2, 128)
@@ -168,10 +168,10 @@ def test_selected_feature_family_is_honored(implementation, monkeypatch, tmp_pat
     data = importlib.import_module("data_final")
     monkeypatch.setitem(data.SESSIONS, 3, ["synthetic_subject"])
     # Supply no de_LDS keys: requesting movingAve must not touch the other family.
-    selected = {f"de_movingAve{i}": np.full((62, 9, 5), i, dtype=np.float32) for i in range(1, 25)}
+    selected = {f"de_movingAve{i}": np.full((62, 4, 5), i, dtype=np.float32) for i in range(1, 25)}
     monkeypatch.setattr(data.scipy.io, "loadmat", lambda *a, **kw: selected)
     subjects, labels = data.load_subjects(tmp_path, 3, "de_movingAve")
-    assert subjects[0].shape == (24, 9, 62, 5)
+    assert subjects[0].shape == (24, 4, 62, 5)
     np.testing.assert_array_equal(subjects[0][:, 0, 0, 0], np.arange(1, 25))
     np.testing.assert_array_equal(labels[0], data.LABELS[3])
 
@@ -181,19 +181,20 @@ def test_seed_v_session_selection(implementation, tmp_path, monkeypatch):
         pytest.skip("SEED-V-specific archive session selection")
     data = importlib.import_module("data_final")
     monkeypatch.setattr(data, "SUBJECTS", ["synthetic"])
-    features = {i: np.full((1, 310), i, dtype=np.float32) for i in range(45)}
+    features = {i: np.full((4, 310), i, dtype=np.float32) for i in range(45)}
     labels = {i: np.array([i % 5]) for i in range(45)}
     np.savez(tmp_path / "synthetic.npz", data=pickle.dumps(features), label=pickle.dumps(labels))
     for session in (1, 2, 3):
         subjects, _ = data.load_subjects(tmp_path, session, "de_LDS")
         expected = np.arange((session - 1) * 15, session * 15)
-        np.testing.assert_array_equal(subjects[0][:, 0], expected)
+        assert subjects[0].shape == (15, 4, 310)
+        np.testing.assert_array_equal(subjects[0][:, 0, 0], expected)
 
 
 def test_cli_result_contains_measured_provenance(implementation, tmp_path, monkeypatch):
     m = implementation
     rng = np.random.default_rng(2)
-    subjects = [rng.normal(size=(3, 1, 62, 5)).astype(np.float32) for _ in range(2)]
+    subjects = [rng.normal(size=(3, 4, 62, 5)).astype(np.float32) for _ in range(2)]
     labels = [np.arange(3) for _ in subjects]
     monkeypatch.setattr(m, "load_subjects", lambda *args: (subjects, labels))
     output = tmp_path / "results" / "run.json"
@@ -211,6 +212,14 @@ def test_cli_result_contains_measured_provenance(implementation, tmp_path, monke
     assert result["mean_accuracy"] == result["subjects"][0]["accuracy"]
     assert result["std_accuracy"] == 0
     assert "source_revision" in result
+    assert result["architecture"]["window_size"] == 4
+    assert result["architecture"]["normalization"] == "post"
+    resolved = json.loads(output.with_suffix(".config.json").read_text(encoding="utf-8"))
+    assert resolved["config"]["adversarial_weight"] == 0.01
+    assert resolved["config"]["config_version"] == "q-snet-paper-v2"
+    log = output.with_suffix(".log").read_text(encoding="utf-8")
+    assert "pretrain epoch 001/001" in log
+    assert "beta 0.01" in log
     saved = np.load(result["subjects"][0]["predictions"])
     np.testing.assert_array_equal(saved["y_true"], labels[0])
     assert saved["probabilities"].shape == (3, m.parse_args([]).classes)
@@ -226,3 +235,71 @@ def test_reported_results_are_explicitly_not_runtime_measurements():
     assert "80.25 ± 10.89" in readme
     assert "79.31 ± 11.82" in readme
     assert "87.60 ± 7.59" in readme
+
+
+def test_normalization_follows_residual_addition(implementation):
+    block = implementation.EncoderBlock(320, 8, 0.0).eval()
+    x = torch.randn(2, 4, 320) * 3 + 2
+    received = []
+    handle = block.attention.register_forward_pre_hook(lambda _, args: received.append(args[0].detach().clone()))
+    actual = block(x)
+    handle.remove()
+    torch.testing.assert_close(received[0], x)  # Q/K/V see unnormalized input.
+    torch.testing.assert_close(actual, block.norm(x + block.attention(x)))
+    assert not torch.allclose(actual, x + block.attention(block.norm(x)))
+
+
+def test_shared_configuration_and_cli_override(implementation, tmp_path):
+    m = implementation
+    args = m.parse_args([])
+    assert args.window_size == 4
+    assert args.adversarial_weight == 0.01
+    settings = json.loads(m.DEFAULT_CONFIG.read_text(encoding="utf-8"))
+    settings["common"]["window_size"] = 6
+    settings["common"]["adversarial_weight"] = 0.02
+    path = tmp_path / "configuration.json"
+    path.write_text(json.dumps(settings), encoding="utf-8")
+    custom = m.parse_args(["--config", str(path), "--window-size", "5"])
+    assert custom.window_size == 5
+    assert custom.adversarial_weight == 0.02
+    assert len(custom.config_sha256) == 64
+
+
+def test_four_frame_windows_do_not_cross_trials(implementation, tmp_path, monkeypatch):
+    m = implementation
+    data = importlib.import_module("data_final")
+    if m.dataset_folder == "seed-v-89.98":
+        values = np.arange(5 * 310).reshape(5, 310)
+        result, labels = data.trial_windows(values, [2], 4)
+        assert result.shape == (2, 4, 310)
+        np.testing.assert_array_equal(result[1], values[1:5])
+        np.testing.assert_array_equal(labels, [2, 2])
+        with pytest.raises(ValueError):
+            data.trial_windows(values, [1, 1, 2, 2, 2], 4)
+        with pytest.raises(ValueError):
+            data.trial_windows(np.zeros((2, 9, 310)), [1, 1], 4)
+    else:
+        frames = np.arange(5 * 62 * 5).reshape(5, 62, 5)
+        result = data.windows(frames, 4)
+        assert result.shape == (2, 4, 62, 5)
+        np.testing.assert_array_equal(result[1], frames[1:5])
+        with pytest.raises(ValueError):
+            data.windows(frames[:3], 4)
+
+
+def test_figure_box_uses_configuration_instead_of_best_accuracy():
+    root = Path(__file__).resolve().parents[1]
+    spec = importlib.util.spec_from_file_location("sweep_plot", root / "figures/plot_hyperparameters.py")
+    plot = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(plot)
+    sweep = json.loads((root / "figures/hyperparameter_sweep.json").read_text(encoding="utf-8"))
+    config = json.loads((root / "configs/paper.json").read_text(encoding="utf-8"))
+    chosen = plot.configured_indices(sweep, config)
+    beta = next(p for p in sweep["parameters"] if p["key"] == "adversarial_weight")
+    assert beta["values"][chosen["adversarial_weight"]] == 0.01
+    assert beta["values"][np.argmax(beta["results"]["SEED"]["mean"])] == 0.5
+    config["common"]["adversarial_weight"] = 0.1
+    assert beta["values"][plot.configured_indices(sweep, config)["adversarial_weight"]] == 0.1
+    config["common"]["adversarial_weight"] = 0.03
+    with pytest.raises(ValueError):
+        plot.configured_indices(sweep, config)

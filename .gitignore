@@ -4,4 +4,6 @@ __pycache__/
 .venv/
 final_checkpoints/
 final_results.json
+final_results.config.json
+final_results.log
 runs/

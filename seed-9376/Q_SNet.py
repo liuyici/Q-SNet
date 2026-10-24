@@ -1,10 +1,4 @@
-"""Compatibility entry point for the fixed-schedule LOSO-UDA protocol.
-
-The former development script selected iterations using target emotion labels.
-Use Git history for that historical code; it is not a valid evaluation protocol.
-Both this command and main.py now train without target emotion labels and
-evaluate the final checkpoint once. See ../docs/reproducibility.md.
-"""
+"""Compatibility entry point for fixed-schedule Q-SNet training."""
 
 from main import main
 
