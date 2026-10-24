@@ -295,6 +295,16 @@ Region-aware grouping achieves the best performance, indicating that physiologic
 
 ---
 
+## 📈 Hyperparameter Sensitivity
+
+<p align="center">
+  <img src="figures/hyperparameter_sensitivity.png" width="960">
+</p>
+
+Black rectangles mark the selected hyperparameter settings; stars mark the maxima of each curve.
+
+---
+
 ## 🗺️ Feature Distribution Visualization
 
 <p align="center">
@@ -318,7 +328,7 @@ Q-SNet/
 ├── seed-iv/                   # SEED-IV training and evaluation
 ├── seed-v-89.98/               # SEED-V training and evaluation
 ├── configs/paper.json         # Shared training configuration
-├── figures/                   # Sensitivity plot and supplied sweep data
+├── figures/                   # Hyperparameter figure and historical sweep data
 ├── tests/                     # Model and protocol checks
 ├── paper_reported_results.json
 └── README.md
@@ -363,9 +373,9 @@ Channel order must already match the quaternion grouping. The loader preserves t
 
 Pretraining minimizes `L_cls + β L_dom`, with mean cross-entropy for both terms and `β=0.01`. GRL is identity in the forward pass; for feature parameters θ, the gradient is `∇θ L_cls − βλ ∇θ L_dom`. The discriminator minimizes `β L_dom`. The default is `λ(p)=λ_max·(2/(1+exp(-10p))−1)`; `--grl-schedule constant` selects a fixed coefficient. Fine-tuning uses source cross-entropy and pseudo-label class-mean alignment, averaged over feature dimensions and classes present in both batches.
 
-Use `--config` to load a configuration and CLI arguments to override individual settings. The [sensitivity plotting script](figures/plot_hyperparameters.py) reads the same configuration to place the parameter boxes.
+Use `--config` to load a configuration and CLI arguments to override individual settings.
 
-The supplied sensitivity data in `figures/hyperparameter_sweep.json` are historical sweep values and differ from the manuscript's main table; the plot retains those values.
+`figures/hyperparameter_sweep.json` retains the historical sweep data, separate from the figure above. The [plotting script](figures/plot_hyperparameters.py) writes regenerated historical plots to `runs/figures/`.
 
 Validation: `python -m pip install -r requirements-dev.txt` followed by `python -m pytest -q`. The current configuration has not yet been rerun on the full datasets.
 

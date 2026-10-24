@@ -27,7 +27,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=ROOT / "configs/paper.json")
     parser.add_argument("--data", type=Path, default=ROOT / "figures/hyperparameter_sweep.json")
-    parser.add_argument("--output", type=Path, default=ROOT / "figures/hyperparameter_sweep.png")
+    parser.add_argument("--output", type=Path, default=ROOT / "runs/figures/hyperparameter_sweep.png")
     args = parser.parse_args()
     config = json.loads(args.config.read_text(encoding="utf-8"))
     sweep = json.loads(args.data.read_text(encoding="utf-8"))
