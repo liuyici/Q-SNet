@@ -11,7 +11,7 @@ Quaternion Spiking Attention Network for Cross-Subject EEG Emotion Recognition
 <p align="center">
   <img src="https://img.shields.io/badge/Task-Cross--Subject%20EEG%20Emotion%20Recognition-2b6cb0?style=flat-square">
   <img src="https://img.shields.io/badge/Model-Quaternion%20Spiking%20Network-2f855a?style=flat-square">
-  <img src="https://img.shields.io/badge/Protocol-LOSOCV-dd6b20?style=flat-square">
+  <img src="https://img.shields.io/badge/Protocol-LOSO--UDA-dd6b20?style=flat-square">
   <img src="https://img.shields.io/badge/Datasets-SEED%20%7C%20SEED--IV%20%7C%20SEED--V-6b46c1?style=flat-square">
   <img src="https://img.shields.io/badge/Status-Code%20Released-111827?style=flat-square">
 </p>
@@ -53,23 +53,15 @@ The method addresses three issues in cross-subject EEG decoding:
 
 - **Quaternion Rotation Attention (QRA).** Learnable quaternion rotations are introduced into the attention module to improve feature alignment under subject-dependent shifts.
 
-- **Quaternion LIF neuron (Q-LIF).** Spike firing is triggered by quaternion magnitude rather than scalar membrane potential, leading to rotation-invariant spiking dynamics.
+- **Quaternion LIF neuron (Q-LIF).** The magnitude threshold decision is invariant to unit-quaternion rotations of the integrated membrane state.
 
-- **Strong cross-subject performance.** Q-SNet achieves consistent gains on SEED, SEED-IV, and SEED-V under leave-one-subject-out cross-validation.
+- **Cross-subject evaluation.** Q-SNet is evaluated with labeled source subjects and an unlabeled target subject under the LOSO-UDA protocol.
 
 ---
 
 ## 🧩 Method Overview
 
-Q-SNet follows a three-stage pipeline.
-
-<p align="center">
-  <img src="fig3_algorithm_training.png" width="780">
-</p>
-
-<p align="center">
-  <sub><b>Algorithm 1.</b> Training pipeline of Q-SNet.</sub>
-</p>
+The manuscript describes a three-stage pipeline. The released entry points cover training and evaluation on precomputed features for SEED, SEED-IV and SEED-V.
 
 <table>
 <tr>
@@ -78,7 +70,7 @@ Q-SNet follows a three-stage pipeline.
 <td width="35%" align="center"><b>Stage 3</b></td>
 </tr>
 <tr>
-<td align="center"><sub><b>Quaternion DE extraction</b><br>Source and target EEG trials are transformed into quaternion differential entropy features.</sub></td>
+<td align="center"><sub><b>Offline quaternion DE extraction</b><br>Source and target trials are converted to quaternion differential entropy features before the training entry point is run.</sub></td>
 <td align="center"><sub><b>Structural pre-training</b><br>QRA and Q-LIF are optimized with source classification and adversarial domain learning.</sub></td>
 <td align="center"><sub><b>Conditional fine-tuning</b><br>Target pseudo-labels are used for class-wise source-target alignment.</sub></td>
 </tr>
@@ -89,21 +81,13 @@ Q-SNet follows a three-stage pipeline.
 ## 🧮 Algorithm Details
 
 <details open>
-<summary><b>Algorithm 2: Quaternion-based DE Feature Extraction</b></summary>
+<summary><b>Offline Quaternion DE Feature Extraction</b></summary>
 
-<p align="center">
-  <img src="fig4_algorithm_quatde.png" width="760">
-</p>
-
-This stage groups EEG channels into quaternion representations, applies quaternion spectral analysis, and extracts component-wise differential entropy features.
+This is the offline preprocessing stage described in the manuscript. The dataset entry points consume precomputed feature arrays; raw-EEG LQFT/Q-DE extraction is not included in these entry points.
 </details>
 
 <details open>
-<summary><b>Algorithm 3: Quaternion Rotation Attention</b></summary>
-
-<p align="center">
-  <img src="fig5_algorithm_qra.png" width="760">
-</p>
+<summary><b>Quaternion Rotation Attention</b></summary>
 
 QRA replaces real-valued projections with quaternion projections and rotates the value component using a learnable unit quaternion:
 
@@ -111,11 +95,11 @@ QRA replaces real-valued projections with quaternion projections and rotates the
   <code>V_rot = R ⊗ V ⊗ R*</code>
 </p>
 
-where <code>⊗</code> denotes the Hamilton product.
+where <code>⊗</code> denotes the Hamilton product. Attention applies component-wise Softmax to quaternion scores, followed by an output projection and post-residual LayerNorm. The rotation quaternion is normalized before use.
 </details>
 
 <details open>
-<summary><b>Algorithm 4: Quaternion LIF Dynamics</b></summary>
+<summary><b>Quaternion LIF Dynamics</b></summary>
 
 <p align="center">
   <img src="fig6_algorithm_qlif.png" width="760">
@@ -127,7 +111,7 @@ Q-LIF integrates quaternion-valued membrane states and triggers spikes according
   <code>S = Θ(||U|| − V_th)</code>
 </p>
 
-This magnitude-triggered mechanism is invariant to unit-quaternion rotations.
+The threshold decision is invariant to unit-quaternion rotations of the integrated membrane state.
 </details>
 
 ---
@@ -145,7 +129,7 @@ This magnitude-triggered mechanism is invariant to unit-quaternion rotations.
 
 ## 📊 Manuscript-reported Results
 
-Mean ± standard deviation (%) reported in the manuscript. Results generated by the current code are saved separately with their configuration, training log and per-subject predictions.
+Mean ± standard deviation (%) reported in the manuscript. The repository keeps the reported table separate from run outputs.
 
 <table>
 <thead>
@@ -200,7 +184,7 @@ Mean ± standard deviation (%) reported in the manuscript. Results generated by 
 </thead>
 <tbody>
 <tr>
-<td><sub>w/o Quaternion Self-Attention</sub></td>
+<td><sub>w/o Quaternion RA</sub></td>
 <td align="center"><sub>88.44 ± 6.42</sub></td>
 <td align="center"><sub>66.16 ± 10.41</sub></td>
 <td align="center"><sub>83.20 ± 12.44</sub></td>
@@ -321,7 +305,7 @@ Region-aware grouping achieves the best performance, indicating that physiologic
   <sub><b>Figure 2.</b> t-SNE visualization from raw EEG signals to quaternion DE features, after pre-training, and after fine-tuning.</sub>
 </p>
 
-The visualization shows a clear evolution of feature geometry. Raw EEG samples are highly mixed across subjects and emotion categories. After quaternion DE extraction and pre-training, the distribution becomes more structured. After fine-tuning, samples from the same emotion category form clearer clusters, and the source-target overlap improves.
+The visualization shows the feature geometry at the stages used in the manuscript. Raw-EEG preprocessing is offline; the training entry points begin from the supplied feature representation.
 
 ---
 ## 📁 Repository Layout
@@ -330,16 +314,14 @@ Dataset entry points share the settings in [configs/paper.json](configs/paper.js
 
 ```text
 Q-SNet/
-├── seed-9376/                 # SEED experiment folder, reported Acc. = 93.76%
-├── seed-iv/                   # SEED-IV, score-independent folder name
-├── seed-v-89.98/              # SEED-V experiment folder, reported Acc. = 89.98%
-├── README.md
-├── fig1.png
-├── fig3_algorithm_training.png
-├── fig4_algorithm_quatde.png
-├── fig5.png
-├── fig5_algorithm_qra.png
-└── fig6_algorithm_qlif.png
+├── seed-9376/                 # SEED training and evaluation
+├── seed-iv/                   # SEED-IV training and evaluation
+├── seed-v-89.98/               # SEED-V training and evaluation
+├── configs/paper.json         # Shared training configuration
+├── figures/                   # Sensitivity plot and supplied sweep data
+├── tests/                     # Model and protocol checks
+├── paper_reported_results.json
+└── README.md
 ```
 
 ---
@@ -349,10 +331,10 @@ Python 3.10+:
 
 ```bash
 python -m pip install -r requirements.txt
-python seed-iv/main.py --file-path /data/SEED_IV/eeg_feature_smooth --session 3 --device cuda
+python seed-iv/main.py --file-path /data/SEED_IV/eeg_feature_smooth --session 3 --device cuda --results-file runs/seed-iv/results.json --checkpoint-dir runs/seed-iv/checkpoints
 ```
 
-`main.py` and `Q_SNet.py` use the same fixed schedule: 50 pretraining epochs, 200 fine-tuning epochs, then one final target-label evaluation. Training uses target inputs without emotion labels.
+`main.py` and `Q_SNet.py` use the same schedule: 50 pretraining epochs, 200 fine-tuning epochs, then one final target-label evaluation. Training uses target inputs without emotion labels.
 
 ### Default configuration
 
@@ -362,11 +344,28 @@ python seed-iv/main.py --file-path /data/SEED_IV/eeg_feature_smooth --session 3 
 | Input | One five-band feature family, 62 × 5 = 310 effective features |
 | Quaternion storage | 320 components after channel-group padding |
 | QRA | 8 heads, depth 6; `LayerNorm(x + Dropout(Attention(x)))` |
-| Spiking head and classifier | 320 → 256 → 128 → bottleneck 64 → logits |
+| Spiking head and classifier | 310 effective features (320 padded storage) → 256 → 128 → bottleneck 64 → logits |
+| Optimizer | SGD, learning rate 0.001, momentum 0.9, weight decay 0.0005 |
 | Domain loss weight | β = 0.01 |
 | GRL | Sigmoid schedule, λ maximum = 1 |
 
-Use `--config` to load a configuration and CLI arguments to override individual settings. See [reproducibility](docs/reproducibility.md) for the loss equations, input format and saved artifacts. The [sensitivity plotting script](figures/plot_hyperparameters.py) reads the same configuration to place the parameter boxes.
+Q-LIF uses decay `exp(-1)` (implemented by `tau=1.0` in `exp(-1/tau)`) and threshold `0.4`.
+
+### Input and outputs
+
+SEED and SEED-IV read MAT arrays `de_LDS1`, `de_LDS2`, … in `[62, frames, 5]` layout. SEED expects `label.mat` and subject MAT files under `--file-path`; SEED-IV expects the session subfolder. SEED-V reads `1_123.npz` through `16_123.npz`, with pickled trial dictionaries under `data` and `label`; each trial is `[frames,310]` or `[frames,62,5]` (or already windowed with four steps).
+
+Channel order must already match the quaternion grouping. The loader preserves the supplied order and packs consecutive groups of four; it does not reorder electrodes. Four-frame windows stay within each trial. SEED retains the last 185 frames per trial, SEED-IV the last 100; SEED-V uses all supplied frames. Defaults select session 1 for SEED and session 3 for SEED-IV/SEED-V.
+
+`--target 0` runs all subjects; positive values select one target subject. Each run saves its resolved configuration, training log, final checkpoints, per-subject predictions and measured results. Metrics in run JSON files use fractions and population standard deviation (`ddof=0`).
+
+### Training objective
+
+Pretraining minimizes `L_cls + β L_dom`, with mean cross-entropy for both terms and `β=0.01`. GRL is identity in the forward pass; for feature parameters θ, the gradient is `∇θ L_cls − βλ ∇θ L_dom`. The discriminator minimizes `β L_dom`. The default is `λ(p)=λ_max·(2/(1+exp(-10p))−1)`; `--grl-schedule constant` selects a fixed coefficient. Fine-tuning uses source cross-entropy and pseudo-label class-mean alignment, averaged over feature dimensions and classes present in both batches.
+
+Use `--config` to load a configuration and CLI arguments to override individual settings. The [sensitivity plotting script](figures/plot_hyperparameters.py) reads the same configuration to place the parameter boxes.
+
+The supplied sensitivity data in `figures/hyperparameter_sweep.json` are historical sweep values and differ from the manuscript's main table; the plot retains those values.
 
 Validation: `python -m pip install -r requirements-dev.txt` followed by `python -m pytest -q`. The current configuration has not yet been rerun on the full datasets.
 

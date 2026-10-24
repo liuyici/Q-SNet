@@ -10,4 +10,4 @@ python seed-iv/main.py --file-path /data/SEED-IV/features --device cuda --result
 Run from the repository root. `Q_SNet.py` calls the same entry point.
 Defaults: four feature frames, post-residual LayerNorm, a 64-dimensional
 classifier bottleneck, β=0.01 and fixed-schedule final evaluation.
-See [reproducibility](../docs/reproducibility.md) for data formats and outputs.
+See [input and outputs](../README.md#input-and-outputs) for data formats and saved artifacts.
