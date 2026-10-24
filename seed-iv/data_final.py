@@ -34,10 +34,12 @@ LABELS = {
 
 
 def windows(features, size):
+    if size <= 0 or features.shape[0] < size:
+        raise ValueError(f"Need at least {size} feature frames, got {features.shape[0]}")
     return np.stack([features[index:index + size] for index in range(features.shape[0] - size + 1)])
 
 
-def load_subjects(file_path, session, feature):
+def load_subjects(file_path, session, feature, window_size=4):
     root = Path(file_path) / str(session)
     subjects = []
     labels = []
@@ -46,11 +48,12 @@ def load_subjects(file_path, session, feature):
         subject_features = []
         subject_labels = []
         for trial_index, trial_label in enumerate(LABELS[session]):
-            first = data[f"de_LDS{trial_index + 1}"]
-            second = data[f"de_movingAve{trial_index + 1}"]
-            trial = np.swapaxes(np.concatenate((first, second), axis=2), 0, 1)
+            # One selected feature family: 62 channels x 5 bands = 310.
+            trial = np.swapaxes(data[f"{feature}{trial_index + 1}"], 0, 1)
+            if trial.ndim != 3 or trial.shape[1:] != (62, 5):
+                raise ValueError(f"Expected [time, 62, 5] for {feature}{trial_index + 1}, got {trial.shape}")
             trial = trial[-100:]
-            trial_windows = windows(trial, 9)
+            trial_windows = windows(trial, window_size)
             subject_features.append(trial_windows)
             subject_labels.append(np.full(trial_windows.shape[0], trial_label, dtype=np.int64))
         subjects.append(np.concatenate(subject_features, axis=0).astype(np.float32))
@@ -75,6 +78,10 @@ class EvaluationData:
 
 
 def build_loso_loaders(subjects, labels, target_index, batch_size, evaluation_batch_size):
+    if len(subjects) != len(labels) or len(subjects) < 2:
+        raise ValueError("LOSO requires matching data/labels for at least two subjects")
+    if not 0 <= target_index < len(subjects):
+        raise ValueError("Target subject index is out of range")
     source_inputs = []
     source_labels = []
     source_domains = []
@@ -94,7 +101,7 @@ def build_loso_loaders(subjects, labels, target_index, batch_size, evaluation_ba
     source_d = torch.from_numpy(np.concatenate(source_domains, axis=0)).long()
     target_x = torch.from_numpy(target_inputs).float()
     evaluation_y = torch.from_numpy(evaluation_labels).long()
-    source_loader = DataLoader(TensorDataset(source_x, source_y, source_d), batch_size=batch_size, shuffle=True, drop_last=True)
-    target_loader = DataLoader(TensorDataset(target_x), batch_size=batch_size, shuffle=True, drop_last=True)
+    source_loader = DataLoader(TensorDataset(source_x, source_y, source_d), batch_size=batch_size, shuffle=True, drop_last=False)
+    target_loader = DataLoader(TensorDataset(target_x), batch_size=batch_size, shuffle=True, drop_last=False)
     evaluation_data = EvaluationData(target_x, evaluation_y, evaluation_batch_size)
     return source_loader, target_loader, evaluation_data

@@ -1,0 +1,54 @@
+{
+  "status": "manuscript_reported_not_independently_reproduced",
+  "source": "Maintainer-provided cas-dc-template.tex, abstract and experimental tables, checked 2026-10-24",
+  "source_sha256": "7f372b57e2ccb626193180e304eb098242fd187e255c59ee5de50081ef6e025c",
+  "units": "percent",
+  "datasets": {
+    "SEED": {
+      "classes": 3,
+      "accuracy": {
+        "mean": 93.76,
+        "std": 5.08
+      },
+      "macro_f1": {
+        "mean": 93.73,
+        "std": 5.13
+      },
+      "macro_auc": {
+        "mean": 94.32,
+        "std": 3.81
+      }
+    },
+    "SEED-IV": {
+      "classes": 4,
+      "accuracy": {
+        "mean": 80.25,
+        "std": 10.89
+      },
+      "macro_f1": {
+        "mean": 79.31,
+        "std": 11.82
+      },
+      "macro_auc": {
+        "mean": 87.6,
+        "std": 7.59
+      }
+    },
+    "SEED-V": {
+      "classes": 5,
+      "accuracy": {
+        "mean": 89.98,
+        "std": 11.8
+      },
+      "macro_f1": {
+        "mean": 89.53,
+        "std": 12.57
+      },
+      "macro_auc": {
+        "mean": 93.68,
+        "std": 7.48
+      }
+    }
+  },
+  "note": "Manuscript values; per-run measurements are stored separately."
+}
