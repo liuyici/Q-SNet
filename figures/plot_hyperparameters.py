@@ -80,8 +80,9 @@ def main():
     fig.savefig(args.output.with_suffix(".pdf"))
     plt.close(fig)
     metadata = {"data_version": sweep["version"], "config_version": config["version"],
-                "data_sha256": hashlib.sha256(args.data.read_bytes()).hexdigest(),
-                "config_sha256": hashlib.sha256(args.config.read_bytes()).hexdigest(),
+                "hash_format": "canonical-json-sort-keys",
+                "data_sha256": hashlib.sha256(json.dumps(sweep, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest(),
+                "config_sha256": hashlib.sha256(json.dumps(config, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest(),
                 "selected_values": {p["key"]: p["values"][selected[p["key"]]]
                                     for p in sweep["parameters"]}}
     args.output.with_suffix(".metadata.json").write_text(json.dumps(metadata, indent=2)+"\n", encoding="utf-8")

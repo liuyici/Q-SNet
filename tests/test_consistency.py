@@ -1,4 +1,5 @@
 import importlib
+import hashlib
 import json
 import pickle
 import sys
@@ -263,6 +264,9 @@ def test_shared_configuration_and_cli_override(implementation, tmp_path):
     assert custom.window_size == 5
     assert custom.adversarial_weight == 0.02
     assert len(custom.config_sha256) == 64
+    same_values = tmp_path / "windows-lines.json"
+    same_values.write_bytes(json.dumps(settings, indent=2).replace("\n", "\r\n").encode("utf-8"))
+    assert m.parse_args(["--config", str(same_values)]).config_sha256 == custom.config_sha256
 
 
 def test_four_frame_windows_do_not_cross_trials(implementation, tmp_path, monkeypatch):
@@ -294,6 +298,10 @@ def test_figure_box_uses_configuration_instead_of_best_accuracy():
     spec.loader.exec_module(plot)
     sweep = json.loads((root / "figures/hyperparameter_sweep.json").read_text(encoding="utf-8"))
     config = json.loads((root / "configs/paper.json").read_text(encoding="utf-8"))
+    metadata = json.loads((root / "figures/hyperparameter_sweep.metadata.json").read_text(encoding="utf-8"))
+    for key, document in (("config_sha256", config), ("data_sha256", sweep)):
+        canonical = json.dumps(document, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        assert metadata[key] == hashlib.sha256(canonical).hexdigest()
     chosen = plot.configured_indices(sweep, config)
     beta = next(p for p in sweep["parameters"] if p["key"] == "adversarial_weight")
     assert beta["values"][chosen["adversarial_weight"]] == 0.01

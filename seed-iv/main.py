@@ -522,7 +522,9 @@ def parse_args(argv=None):
     parser.set_defaults(**defaults)
     args = parser.parse_args(argv)
     args.config_version = settings["version"]
-    args.config_sha256 = hashlib.sha256(Path(args.config).read_bytes()).hexdigest()
+    # Hash configuration values consistently across Windows/Linux line endings.
+    canonical = json.dumps(settings, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    args.config_sha256 = hashlib.sha256(canonical).hexdigest()
     for name in ("window_size", "pretrain_epochs", "fine_tune_epochs", "batch_size", "evaluation_batch_size", "depth", "heads"):
         if getattr(args, name) <= 0:
             parser.error(f"--{name.replace('_', '-')} must be positive")

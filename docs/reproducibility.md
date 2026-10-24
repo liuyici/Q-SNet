@@ -3,7 +3,7 @@
 ## Configuration and input
 
 `configs/paper.json` is the shared configuration for all three dataset entry points.
-Its version, SHA-256 and resolved CLI settings are recorded for every run.
+Its version, canonical-JSON SHA-256 and resolved CLI settings are recorded for every run.
 
 | Component | Configuration |
 | --- | --- |
