@@ -2,6 +2,7 @@ import argparse
 import json
 import math
 import random
+import subprocess
 from pathlib import Path
 
 import numpy as np
@@ -50,35 +51,43 @@ def merge_components(q):
     return torch.cat(q.unbind(dim=-1), dim=-1)
 
 
-def prepare_quaternion_sequence(x, quaternion_dim):
+# Table 1 counts real, measured features: 62 channels x 5 bands = 310.
+# Two padded channels complete the last quaternion in each of the five bands.
+INPUT_CHANNELS = 62
+INPUT_BANDS = 5
+INPUT_DIM = INPUT_CHANNELS * INPUT_BANDS
+QUATERNION_DIM = 4 * math.ceil(INPUT_CHANNELS / 4) * INPUT_BANDS
+
+
+def prepare_quaternion_sequence(x, quaternion_dim=QUATERNION_DIM):
+    """Pack [B,T,62,5] (or channel-major [B,T,310]) into 320 components.
+
+    Channels must already be in the intended grouping order. This function
+    packs supplied features; it does not compute raw-EEG LQFT/Q-DE features.
+    """
+    if quaternion_dim != QUATERNION_DIM:
+        raise ValueError("The 62-channel, five-band configuration requires 320 stored components")
     if x.ndim == 2:
         x = x.unsqueeze(1)
-    if x.ndim == 4:
-        batch, steps, channels, features = x.shape
-        channel_padding = (-channels) % 4
-        if channel_padding:
-            x = F.pad(x, (0, 0, 0, channel_padding))
-        q = x.permute(0, 1, 3, 2).contiguous().reshape(batch, steps, -1, 4)
-    elif x.ndim >= 3:
-        batch, steps = x.shape[:2]
-        flat = x.reshape(batch, steps, -1)
-        feature_padding = (-flat.size(-1)) % 4
-        if feature_padding:
-            flat = F.pad(flat, (0, feature_padding))
-        q = flat.reshape(batch, steps, -1, 4)
-    else:
-        raise ValueError("Input must contain a batch dimension and a feature dimension")
-    required_units = quaternion_dim // 4
-    if q.size(-2) > required_units:
-        raise ValueError(f"Prepared input has {q.size(-2) * 4} components, expected at most {quaternion_dim}")
-    if q.size(-2) < required_units:
-        q = F.pad(q, (0, 0, 0, required_units - q.size(-2)))
+    if x.ndim == 3:
+        if x.size(-1) != INPUT_DIM:
+            raise ValueError("Expected 310 channel-major features; do not concatenate feature families")
+        x = x.reshape(*x.shape[:2], INPUT_CHANNELS, INPUT_BANDS)
+    if x.ndim != 4 or tuple(x.shape[-2:]) != (INPUT_CHANNELS, INPUT_BANDS):
+        raise ValueError("Expected [batch, steps, 62 channels, 5 bands]")
+    if x.size(1) == 0:
+        raise ValueError("At least one temporal step is required")
+    batch, steps = x.shape[:2]
+    x = F.pad(x, (0, 0, 0, 2))
+    q = x.permute(0, 1, 3, 2).contiguous().reshape(batch, steps, -1, 4)
     return merge_components(q)
 
 
 class GradientReverse(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x, strength):
+        if not math.isfinite(strength) or strength < 0:
+            raise ValueError("GRL lambda must be finite and nonnegative")
         ctx.strength = strength
         return x.view_as(x)
 
@@ -87,10 +96,40 @@ class GradientReverse(torch.autograd.Function):
         return -ctx.strength * grad_output, None
 
 
+def grl_coefficient(progress, maximum=1.0, schedule="sigmoid"):
+    """lambda(p); beta is a separate, positive weight on the domain CE."""
+    if not math.isfinite(maximum) or maximum < 0:
+        raise ValueError("GRL lambda must be finite and nonnegative")
+    if not 0.0 <= progress <= 1.0:
+        raise ValueError("Training progress must lie in [0, 1]")
+    if schedule == "constant":
+        return maximum
+    if schedule == "sigmoid":
+        return maximum * (2.0 / (1.0 + math.exp(-10.0 * progress)) - 1.0)
+    raise ValueError(f"Unknown GRL schedule: {schedule}")
+
+
+def pretraining_objective(source_logits, source_labels, domain_features,
+                          domain_labels, discriminator, beta, grl_lambda):
+    """Forward: L_cls + beta L_dom; feature domain gradient: -beta lambda grad(L_dom).
+
+    Both cross-entropies use mean reduction. GRL reverses only the gradient
+    into features; the discriminator minimizes beta * L_dom. Do not put an
+    additional minus sign or lambda multiplier on the scalar domain loss.
+    """
+    if not math.isfinite(beta) or beta < 0:
+        raise ValueError("Adversarial weight beta must be finite and nonnegative")
+    cls_loss = F.cross_entropy(source_logits, source_labels, reduction="mean")
+    reversed_features = GradientReverse.apply(domain_features, grl_lambda)
+    domain_logits = discriminator(reversed_features)
+    domain_loss = F.cross_entropy(domain_logits, domain_labels, reduction="mean")
+    return cls_loss + beta * domain_loss, cls_loss, domain_loss
+
+
 class QuaternionRotationAttention(nn.Module):
     def __init__(self, dim, heads, dropout):
         super().__init__()
-        if dim % (4 * heads) != 0:
+        if heads <= 0 or dim <= 0 or dim % (4 * heads) != 0:
             raise ValueError("Quaternion dimension must be divisible by four times the number of heads")
         self.dim = dim
         self.heads = heads
@@ -142,8 +181,10 @@ class EncoderBlock(nn.Module):
 class QuaternionLIFLayer(nn.Module):
     def __init__(self, input_dim, output_dim, tau, threshold, surrogate_width):
         super().__init__()
-        if output_dim % 4 != 0:
-            raise ValueError("Q-LIF output dimension must be divisible by four")
+        if input_dim <= 0 or output_dim <= 0 or input_dim % 4 or output_dim % 4:
+            raise ValueError("Q-LIF stored dimensions must be positive multiples of four")
+        if tau <= 0 or threshold <= 0 or surrogate_width <= 0:
+            raise ValueError("Q-LIF tau, threshold and surrogate width must be positive")
         self.projection = QuaternionLinear(input_dim, output_dim)
         self.output_dim = output_dim
         self.register_buffer("decay", torch.tensor(math.exp(-1.0 / tau)))
@@ -199,15 +240,21 @@ class CosineClassifier(nn.Module):
 class Q_SNetFinal(nn.Module):
     def __init__(self, quaternion_dim, classes, hidden_dim, depth, heads, dropout, tau, threshold):
         super().__init__()
+        if quaternion_dim != QUATERNION_DIM:
+            raise ValueError("310 measured features require 320 stored quaternion components")
+        if depth < 1:
+            raise ValueError("QRA depth must be positive")
+        self.input_dim = INPUT_DIM
         self.quaternion_dim = quaternion_dim
         self.encoder = nn.Sequential(*[EncoderBlock(quaternion_dim, heads, dropout) for _ in range(depth)])
         self.qlif = QLIFEncoder(quaternion_dim, hidden_dim, tau, threshold, dropout)
-        self.classifier = CosineClassifier(128, classes)
+        self.bottleneck = nn.Sequential(nn.Linear(128, 64), nn.ELU())
+        self.classifier = CosineClassifier(64, classes)
 
     def forward(self, x):
         x = prepare_quaternion_sequence(x, self.quaternion_dim)
         feature = self.qlif(self.encoder(x))
-        return feature, self.classifier(feature)
+        return feature, self.classifier(self.bottleneck(feature))
 
 
 class DomainDiscriminator(nn.Module):
@@ -243,7 +290,7 @@ def next_batch(iterator, loader):
 
 
 class FinalProtocol:
-    def __init__(self, model, classes, device, learning_rate, weight_decay, mmd_weight, confidence, domains, target_domain, adversarial_weight):
+    def __init__(self, model, classes, device, learning_rate, weight_decay, mmd_weight, confidence, domains, target_domain, adversarial_weight, grl_lambda=1.0, grl_schedule="sigmoid"):
         self.model = model.to(device)
         self.classes = classes
         self.device = device
@@ -254,11 +301,15 @@ class FinalProtocol:
         self.domains = domains
         self.target_domain = target_domain
         self.adversarial_weight = adversarial_weight
+        self.grl_lambda = grl_lambda
+        self.grl_schedule = grl_schedule
         self.discriminator = DomainDiscriminator(domains).to(device)
 
     def pretrain(self, source_loader, target_loader, epochs):
         parameters = list(self.model.parameters()) + list(self.discriminator.parameters())
         optimizer = torch.optim.SGD(parameters, lr=self.learning_rate, momentum=0.9, weight_decay=self.weight_decay)
+        if not len(source_loader) or not len(target_loader):
+            raise ValueError("Both source and unlabeled target loaders must have batches")
         steps = max(len(source_loader), len(target_loader))
         for epoch in range(epochs):
             self.model.train()
@@ -278,11 +329,13 @@ class FinalProtocol:
                 source_feature, source_logits = self.model(source_x)
                 target_feature, _ = self.model(target_x)
                 progress = (epoch * steps + step + 1) / (epochs * steps)
-                strength = 2.0 / (1.0 + math.exp(-10.0 * progress)) - 1.0
-                domain_feature = GradientReverse.apply(torch.cat((source_feature, target_feature), dim=0), strength)
-                domain_logits = self.discriminator(domain_feature)
+                strength = grl_coefficient(progress, self.grl_lambda, self.grl_schedule)
+                domain_feature = torch.cat((source_feature, target_feature), dim=0)
                 domain_labels = torch.cat((source_domain, torch.full((target_feature.size(0),), self.target_domain, dtype=torch.long, device=self.device)))
-                loss = F.cross_entropy(source_logits, source_y) + self.adversarial_weight * F.cross_entropy(domain_logits, domain_labels)
+                loss, cls_loss, domain_loss = pretraining_objective(
+                    source_logits, source_y, domain_feature, domain_labels,
+                    self.discriminator, self.adversarial_weight, strength,
+                )
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
@@ -291,6 +344,8 @@ class FinalProtocol:
 
     def fine_tune(self, source_loader, target_loader, epochs):
         optimizer = torch.optim.SGD(self.model.parameters(), lr=self.learning_rate, momentum=0.9, weight_decay=self.weight_decay)
+        if not len(source_loader) or not len(target_loader):
+            raise ValueError("Both source and unlabeled target loaders must have batches")
         steps = max(len(source_loader), len(target_loader))
         for epoch in range(epochs):
             self.model.train()
@@ -323,7 +378,7 @@ class FinalProtocol:
             print(f"fine-tune epoch {epoch + 1:03d}/{epochs:03d} loss {running / steps:.6f}")
 
 
-def evaluate_once(model, loader, device, classes):
+def evaluate_once(model, loader, device, classes, predictions_path=None):
     model.eval()
     outputs = []
     labels = []
@@ -336,14 +391,22 @@ def evaluate_once(model, loader, device, classes):
     y_true = torch.cat(labels, dim=0).numpy()
     probabilities = F.softmax(logits, dim=1).numpy()
     y_pred = probabilities.argmax(axis=1)
+    if predictions_path is not None:
+        np.savez_compressed(predictions_path, y_true=y_true, y_pred=y_pred,
+                            probabilities=probabilities, classes=np.arange(classes))
     try:
-        binary = label_binarize(y_true, classes=np.arange(classes))
-        auc = float(roc_auc_score(binary, probabilities, average="macro", multi_class="ovr"))
+        if len(np.unique(y_true)) != classes:
+            auc = None  # Macro one-vs-rest AUC requires both labels for every class.
+        else:
+            binary = label_binarize(y_true, classes=np.arange(classes))
+            auc = float(roc_auc_score(binary, probabilities, average="macro", multi_class="ovr"))
+            if not math.isfinite(auc):
+                auc = None
     except ValueError:
         auc = None
     return {
         "accuracy": float((y_pred == y_true).mean()),
-        "macro_f1": float(f1_score(y_true, y_pred, average="macro")),
+        "macro_f1": float(f1_score(y_true, y_pred, labels=np.arange(classes), average="macro", zero_division=0)),
         "macro_auc": auc,
         "confusion_matrix": confusion_matrix(y_true, y_pred, labels=np.arange(classes)).tolist(),
     }
@@ -379,30 +442,37 @@ def run_subject(args, subjects, labels, target_index, device):
         len(subjects),
         target_index,
         args.adversarial_weight,
+        args.grl_lambda,
+        args.grl_schedule,
     )
     protocol.pretrain(source_loader, target_loader, args.pretrain_epochs)
     protocol.fine_tune(source_loader, target_loader, args.fine_tune_epochs)
     checkpoint_directory = Path(args.checkpoint_dir)
     checkpoint_directory.mkdir(parents=True, exist_ok=True)
     checkpoint = checkpoint_directory / f"subject_{target_index + 1:02d}_final.pt"
-    torch.save(model.state_dict(), checkpoint)
+    torch.save({"model_state_dict": model.state_dict(), "config": vars(args),
+                "target_subject": target_index + 1, "input_dim": INPUT_DIM,
+                "quaternion_dim": QUATERNION_DIM}, checkpoint)
     for parameter in model.parameters():
         parameter.requires_grad_(False)
     evaluation_loader = evaluation_data.loader()
-    metrics = evaluate_once(model, evaluation_loader, device, args.classes)
+    predictions = checkpoint_directory / f"subject_{target_index + 1:02d}_predictions.npz"
+    metrics = evaluate_once(model, evaluation_loader, device, args.classes, predictions_path=predictions)
+    metrics["predictions"] = str(predictions)
     metrics["subject"] = target_index + 1
     metrics["checkpoint"] = str(checkpoint)
     return metrics
 
 
-def parse_args():
+def parse_args(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("--file-path", type=str, default="/home/lyc/research/research_5/DA/ExtractedQuantFeatures/")
     parser.add_argument("--session", type=int, default=1)
     parser.add_argument("--feature", type=str, default="de_LDS")
     parser.add_argument("--target", type=int, default=0)
     parser.add_argument("--classes", type=int, default=3)
-    parser.add_argument("--quaternion-dim", type=int, default=320)
+    parser.add_argument("--quaternion-dim", type=int, choices=[QUATERNION_DIM], default=QUATERNION_DIM,
+                        help="320 stored components = (62 + 2 padded channels) x 5 bands")
     parser.add_argument("--hidden-dim", type=int, default=256)
     parser.add_argument("--heads", type=int, default=8)
     parser.add_argument("--depth", type=int, default=6)
@@ -412,7 +482,11 @@ def parse_args():
     parser.add_argument("--learning-rate", type=float, default=0.001)
     parser.add_argument("--weight-decay", type=float, default=0.0005)
     parser.add_argument("--mmd-weight", type=float, default=1.0)
-    parser.add_argument("--adversarial-weight", type=float, default=0.01)
+    parser.add_argument("--adversarial-weight", type=float, default=0.01,
+                        help="beta: positive weight on mean domain cross-entropy")
+    parser.add_argument("--grl-lambda", type=float, default=1.0,
+                        help="lambda: constant GRL coefficient or maximum of its schedule")
+    parser.add_argument("--grl-schedule", choices=["constant", "sigmoid"], default="sigmoid")
     parser.add_argument("--pseudo-label-confidence", type=float, default=0.0)
     parser.add_argument("--pretrain-epochs", type=int, default=50)
     parser.add_argument("--fine-tune-epochs", type=int, default=200)
@@ -422,13 +496,48 @@ def parse_args():
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--checkpoint-dir", type=str, default="final_checkpoints")
     parser.add_argument("--results-file", type=str, default="final_results.json")
-    return parser.parse_args()
+    args = parser.parse_args(argv)
+    for name in ("pretrain_epochs", "fine_tune_epochs", "batch_size", "evaluation_batch_size", "depth", "heads"):
+        if getattr(args, name) <= 0:
+            parser.error(f"--{name.replace('_', '-')} must be positive")
+    if args.target < 0:
+        parser.error("--target must be 0 (all subjects) or a positive subject number")
+    if not math.isfinite(args.adversarial_weight) or args.adversarial_weight < 0:
+        parser.error("--adversarial-weight must be finite and nonnegative")
+    if not math.isfinite(args.grl_lambda) or args.grl_lambda < 0:
+        parser.error("--grl-lambda must be finite and nonnegative")
+    if args.quaternion_dim % (4 * args.heads):
+        parser.error("--heads must divide the 80 quaternion units")
+    return args
+
+
+def aggregate_results(results):
+    """Summarize measured subject scores, in fractions, using population std."""
+    summary = {"standard_deviation_ddof": 0, "metric_units": "fraction"}
+    for metric in ("accuracy", "macro_f1", "macro_auc"):
+        scores = [item[metric] for item in results if item[metric] is not None]
+        summary[f"mean_{metric}"] = float(np.mean(scores)) if scores else None
+        summary[f"std_{metric}"] = float(np.std(scores, ddof=0)) if scores else None
+        summary[f"count_{metric}"] = len(scores)
+    return summary
+
+
+def source_revision():
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=Path(__file__).parent,
+            stderr=subprocess.DEVNULL, text=True, timeout=5,
+        ).strip()
+    except (OSError, subprocess.SubprocessError):
+        return None
 
 
 def main():
     args = parse_args()
     device = torch.device(args.device)
     subjects, labels = load_subjects(args.file_path, args.session, args.feature)
+    if args.target > len(subjects):
+        raise ValueError(f"Target subject {args.target} exceeds {len(subjects)} loaded subjects")
     target_indices = [args.target - 1] if args.target else list(range(len(subjects)))
     results = []
     for target_index in target_indices:
@@ -437,11 +546,18 @@ def main():
     output = {
         "protocol": "fixed training schedule with one final target-label evaluation",
         "subjects": results,
-        "mean_accuracy": float(np.mean([result["accuracy"] for result in results])),
-        "mean_macro_f1": float(np.mean([result["macro_f1"] for result in results])),
+        "config": vars(args),
+        "source_revision": source_revision(),
+        "architecture": {"effective_input_dim": INPUT_DIM, "stored_quaternion_dim": QUATERNION_DIM,
+                         "spiking_hidden_dim": args.hidden_dim, "spiking_output_dim": 128,
+                         "classifier_bottleneck_dim": 64, "attention_heads": args.heads},
+        **aggregate_results(results),
     }
-    Path(args.results_file).write_text(json.dumps(output, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(json.dumps(output, indent=2, ensure_ascii=False))
+    result_path = Path(args.results_file)
+    result_path.parent.mkdir(parents=True, exist_ok=True)
+    serialized = json.dumps(output, indent=2, ensure_ascii=False, allow_nan=False)
+    result_path.write_text(serialized, encoding="utf-8")
+    print(serialized)
 
 
 if __name__ == "__main__":

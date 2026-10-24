@@ -134,18 +134,20 @@ This magnitude-triggered mechanism is invariant to unit-quaternion rotations.
 
 ## 🧠 Theoretical Analysis of Quaternion Rotation-Invariant Spiking
 
-
 <details open>
 <summary><b>Proof</b></summary>
 <p align="center">
   <img src="proof.png" width="760">
 </p>
+</details>
 
 ---
 
-## 📊 Main Results
+## 📊 Manuscript-reported Results
 
-All results are reported under leave-one-subject-out cross-validation. One subject is used as the target domain, and the remaining subjects are used as source domains.
+The following values are transcribed from the manuscript under its LOSO-UDA protocol. They are **paper-reported results, not results independently reproduced by this code correction**. The SEED-IV accuracy is 80.25 ± 10.89%; the matching F1 and AUC are 79.31 ± 11.82% and 87.60 ± 7.59%. Original fold-level predictions and run artifacts are still needed to verify the numerical discrepancy with the historical release.
+
+See [reported-result provenance](paper_reported_results.json) and [the consistency and reproducibility notes](docs/reproducibility.md). Actual runs write their measured scores and standard deviations to a separate results file.
 
 <table>
 <thead>
@@ -168,9 +170,9 @@ All results are reported under leave-one-subject-out cross-validation. One subje
 <tr>
 <td align="center"><sub>SEED-IV</sub></td>
 <td align="center"><sub>4</sub></td>
-<td align="center"><sub><b>78.25 ± 10.89</b></sub></td>
-<td align="center"><sub><b>76.31 ± 11.82</b></sub></td>
-<td align="center"><sub><b>85.60 ± 7.59</b></sub></td>
+<td align="center"><sub><b>80.25 ± 10.89</b></sub></td>
+<td align="center"><sub><b>79.31 ± 11.82</b></sub></td>
+<td align="center"><sub><b>87.60 ± 7.59</b></sub></td>
 </tr>
 <tr>
 <td align="center"><sub>SEED-V</sub></td>
@@ -182,54 +184,7 @@ All results are reported under leave-one-subject-out cross-validation. One subje
 </tbody>
 </table>
 
-
-
-
-<details open>
-<summary>Improvement over the strongest prior baseline</summary>
-
-<table>
-<thead>
-<tr>
-<th align="center"><sub>Dataset</sub></th>
-<th align="center"><sub>Previous Best Acc. (%)</sub></th>
-<th align="center"><sub>Q-SNet Acc. (%)</sub></th>
-<th align="center"><sub>Gain</sub></th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td align="center"><sub>SEED</sub></td>
-<td align="center"><sub>92.59</sub></td>
-<td align="center"><sub><b>93.76</b></sub></td>
-<td align="center"><sub><b>+1.17</b></sub></td>
-</tr>
-<tr>
-<td align="center"><sub>SEED-IV</sub></td>
-<td align="center"><sub>76.52</sub></td>
-<td align="center"><sub><b>78.25</b></sub></td>
-<td align="center"><sub><b>+1.73</b></sub></td>
-</tr>
-<tr>
-<td align="center"><sub>SEED-V</sub></td>
-<td align="center"><sub>80.21</sub></td>
-<td align="center"><sub><b>89.98</b></sub></td>
-<td align="center"><sub><b>+9.77</b></sub></td>
-</tr>
-</tbody>
-</table>
-
-</details>
-
-<details open>
-<summary>All sessions on SEED, SEED-IV and SEED-V datasets</summary>
-
-<p align="center">
-  <img src="all_subjects.png" width="960">
-</p>
-
-</details>
-
+Historical per-subject images and grid-search files are development artifacts; they do not validate the corrected configuration or establish which historical run produced the paper's numbers.
 
 ---
 
@@ -269,7 +224,7 @@ All results are reported under leave-one-subject-out cross-validation. One subje
 <tr>
 <td><sub><b>Q-SNet</b></sub></td>
 <td align="center"><sub><b>93.76 ± 5.08</b></sub></td>
-<td align="center"><sub><b>78.25 ± 10.89</b></sub></td>
+<td align="center"><sub><b>80.25 ± 10.89</b></sub></td>
 <td align="center"><sub><b>89.98 ± 11.80</b></sub></td>
 </tr>
 </tbody>
@@ -312,7 +267,7 @@ The degradation caused by removing QRA, Q-LIF, or MMD indicates that the final p
 <tr>
 <td><sub><b>Learnable random-axis</b></sub></td>
 <td align="center"><sub><b>93.76</b></sub></td>
-<td align="center"><sub><b>78.25</b></sub></td>
+<td align="center"><sub><b>80.25</b></sub></td>
 <td align="center"><sub><b>89.98</b></sub></td>
 </tr>
 </tbody>
@@ -349,7 +304,7 @@ Learnable quaternion rotation consistently outperforms fixed-axis rotations, sug
 <tr>
 <td><sub><b>Region-aware grouping</b></sub></td>
 <td align="center"><sub><b>93.76 ± 5.08</b></sub></td>
-<td align="center"><sub><b>78.25 ± 10.89</b></sub></td>
+<td align="center"><sub><b>80.25 ± 10.89</b></sub></td>
 <td align="center"><sub><b>89.98 ± 11.80</b></sub></td>
 </tr>
 </tbody>
@@ -375,12 +330,12 @@ The visualization shows a clear evolution of feature geometry. Raw EEG samples a
 ---
 ## 📁 Repository Layout
 
-The current repository is organized by dataset-specific reproducibility folders.
+The maintained entry points are organized by dataset. The former `seed-iv-78.25/` directory was renamed to `seed-iv/`; historical code remains in Git history.
 
 ```text
 Q-SNet/
 ├── seed-9376/                 # SEED experiment folder, reported Acc. = 93.76%
-├── seed-iv-78.25/             # SEED-IV experiment folder, reported Acc. = 78.25%
+├── seed-iv/                   # SEED-IV, score-independent folder name
 ├── seed-v-89.98/              # SEED-V experiment folder, reported Acc. = 89.98%
 ├── README.md
 ├── fig1.png
@@ -394,9 +349,24 @@ Q-SNet/
 ---
 ### Reproducibility Entry Points
 
-Run `main.py` inside each dataset folder to obtain the subject-wise average results for the corresponding dataset and experimental protocol.
+Use Python 3.10+ and install `requirements.txt`. Run `main.py` inside a dataset folder, or run it by path from the repository root. `Q_SNet.py` is now a compatibility entry point to the same fixed-schedule training code.
 
-`Q_SNet.py` is retained as a development and debugging script. It includes best-iteration and target-metric monitoring, so it can be useful for implementation checks or private parameter exploration. 
+```bash
+python -m pip install -r requirements.txt
+python seed-iv/main.py --file-path /data/SEED_IV/eeg_feature_smooth --session 3 --feature de_LDS --device cuda
+```
+
+The maintained protocol trains for a fixed 50 pretraining and 200 fine-tuning epochs, saves the final checkpoint, then evaluates target emotion labels once. Target training loaders contain inputs only. Target-label best-iteration selection and monitoring have been removed from executable `Q_SNet.py` entry points. Choose hyperparameters in advance or using source-subject validation only.
+
+### Architecture and loss conventions
+
+- Input: **310 effective real features** = 62 channels × 5 bands from one selected feature family. SEED-IV no longer concatenates `de_LDS` and `de_movingAve`.
+- Quaternion storage: pad two channels per band, giving **320 components**, with 8 attention heads (10 quaternions per head) and depth 6. Table 1's 310 is the unpadded feature count. The executable Q-LIF head is **320 stored → 256 → 128**, followed by a **64-dimensional classifier bottleneck**.
+- Pretraining forward loss: **`L_cls + beta * L_dom`**, with mean cross-entropies and `beta=0.01`. GRL alone changes the feature-side domain gradient to **`-beta * lambda * grad(L_dom)`**; the discriminator receives **`+beta * grad(L_dom)`**. `--grl-lambda` and `--grl-schedule` explicitly configure lambda independently of beta.
+
+The [full derivation and Table 1 clarification](docs/reproducibility.md) distinguish logical dimensions from quaternion storage and specify the GRL schedule. These scripts consume supplied features; packing ordinary DE features does not implement or verify the paper's raw-EEG LQFT/Q-DE extractor. Changed feature dimensions and the bottleneck require retraining, so previous checkpoint accuracies cannot be assigned to this revision.
+
+Install `requirements-dev.txt` and run `python -m pytest -q` for synthetic-data consistency tests. Dataset reproduction requires the actual data and original preprocessing artifacts.
 
 ## Thanks
 
@@ -408,8 +378,6 @@ Run `main.py` inside each dataset folder to obtain the subject-wise average resu
  
 
 ---
-
-
 
 ## Citation
 Hope this code can be useful. I would appreciate you citing us in your paper. 😊

@@ -68,6 +68,10 @@ class EvaluationData:
 
 
 def build_loso_loaders(subjects, labels, target_index, batch_size, evaluation_batch_size):
+    if len(subjects) != len(labels) or len(subjects) < 2:
+        raise ValueError("LOSO requires matching data/labels for at least two subjects")
+    if not 0 <= target_index < len(subjects):
+        raise ValueError("Target subject index is out of range")
     source_inputs = []
     source_labels = []
     source_domains = []
@@ -87,7 +91,7 @@ def build_loso_loaders(subjects, labels, target_index, batch_size, evaluation_ba
     source_d = torch.from_numpy(np.concatenate(source_domains, axis=0)).long()
     target_x = torch.from_numpy(target_inputs).float()
     evaluation_y = torch.from_numpy(evaluation_labels).long()
-    source_loader = DataLoader(TensorDataset(source_x, source_y, source_d), batch_size=batch_size, shuffle=True, drop_last=True)
-    target_loader = DataLoader(TensorDataset(target_x), batch_size=batch_size, shuffle=True, drop_last=True)
+    source_loader = DataLoader(TensorDataset(source_x, source_y, source_d), batch_size=batch_size, shuffle=True, drop_last=False)
+    target_loader = DataLoader(TensorDataset(target_x), batch_size=batch_size, shuffle=True, drop_last=False)
     evaluation_data = EvaluationData(target_x, evaluation_y, evaluation_batch_size)
     return source_loader, target_loader, evaluation_data

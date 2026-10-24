@@ -11,6 +11,10 @@ SUBJECTS = [f"{index}_123" for index in range(1, 17)]
 
 
 def load_subjects(file_path, session, feature):
+    if session not in (1, 2, 3):
+        raise ValueError("Session must be 1, 2, or 3")
+    if feature != "de_LDS":
+        raise ValueError("SEED-V archives contain one precomputed feature family; --feature cannot select another")
     root = Path(file_path)
     subjects = []
     labels = []
@@ -20,7 +24,8 @@ def load_subjects(file_path, session, feature):
         trial_labels = pickle.loads(archive["label"].item())
         subject_features = []
         subject_labels = []
-        for trial_index in range(15, 30):
+        first_trial = (session - 1) * 15
+        for trial_index in range(first_trial, first_trial + 15):
             subject_features.append(np.asarray(data[trial_index]))
             subject_labels.append(np.asarray(trial_labels[trial_index]).reshape(-1))
         subjects.append(np.concatenate(subject_features, axis=0).astype(np.float32))
@@ -45,6 +50,10 @@ class EvaluationData:
 
 
 def build_loso_loaders(subjects, labels, target_index, batch_size, evaluation_batch_size):
+    if len(subjects) != len(labels) or len(subjects) < 2:
+        raise ValueError("LOSO requires matching data/labels for at least two subjects")
+    if not 0 <= target_index < len(subjects):
+        raise ValueError("Target subject index is out of range")
     source_inputs = []
     source_labels = []
     source_domains = []
@@ -64,7 +73,7 @@ def build_loso_loaders(subjects, labels, target_index, batch_size, evaluation_ba
     source_d = torch.from_numpy(np.concatenate(source_domains, axis=0)).long()
     target_x = torch.from_numpy(target_inputs).float()
     evaluation_y = torch.from_numpy(evaluation_labels).long()
-    source_loader = DataLoader(TensorDataset(source_x, source_y, source_d), batch_size=batch_size, shuffle=True, drop_last=True)
-    target_loader = DataLoader(TensorDataset(target_x), batch_size=batch_size, shuffle=True, drop_last=True)
+    source_loader = DataLoader(TensorDataset(source_x, source_y, source_d), batch_size=batch_size, shuffle=True, drop_last=False)
+    target_loader = DataLoader(TensorDataset(target_x), batch_size=batch_size, shuffle=True, drop_last=False)
     evaluation_data = EvaluationData(target_x, evaluation_y, evaluation_batch_size)
     return source_loader, target_loader, evaluation_data
